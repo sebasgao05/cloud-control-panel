@@ -1,0 +1,77 @@
+{
+  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias. Editado solo por admin.",
+
+  "settings": {
+    "defaultRegion": "us-east-1",
+    "pollIntervalSeconds": 30,
+    "timezone": "America/Bogota"
+  },
+
+  "apiKeys": {
+    "CHANGE_ME_admin_key": {
+      "name": "Admin Principal",
+      "role": "admin",
+      "accounts": ["*"]
+    },
+    "CHANGE_ME_operator_key": {
+      "name": "Operador paridad",
+      "role": "operator",
+      "accounts": ["paridad"]
+    }
+  },
+
+  "accounts": [
+    {
+      "id": "paridad",
+      "name": "TEST - paridad",
+      "awsAccountId": "111111111111",
+      "region": "us-east-1",
+      "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
+      "instances": [
+        {
+          "id": "par-app-server",
+          "name": "App Server",
+          "instanceId": "i-0xxxxxxxxxxxxxxxxx",
+          "description": "Servidor principal de aplicacion",
+          "dashboardPort": 5476,
+          "group": "paridad-core"
+        },
+        {
+          "id": "par-db-server",
+          "name": "DB Server",
+          "instanceId": "i-0yyyyyyyyyyyyyyyyy",
+          "description": "Servidor de base de datos",
+          "dashboardPort": null,
+          "group": "paridad-core"
+        }
+      ],
+      "groups": [
+        {
+          "id": "paridad-core",
+          "name": "Core paridad",
+          "description": "Infraestructura principal paridad (se encienden/apagan juntas)",
+          "startOrder": ["par-db-server", "par-app-server"],
+          "stopOrder": ["par-app-server", "par-db-server"]
+        }
+      ]
+    },
+    {
+      "id": "SBG-10",
+      "name": "PROD - SBG 10",
+      "awsAccountId": "222222222222",
+      "region": "us-east-1",
+      "crossAccountRoleArn": "arn:aws:iam::222222222222:role/CloudControlRemoteAccess",
+      "instances": [
+        {
+          "id": "SBG-main",
+          "name": "Main Server",
+          "instanceId": "i-0zzzzzzzzzzzzzzzzz",
+          "description": "Servidor principal SBG",
+          "dashboardPort": 5476,
+          "group": null
+        }
+      ],
+      "groups": []
+    }
+  ]
+}

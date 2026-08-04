@@ -1,0 +1,38 @@
+{
+  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias.",
+
+  "settings": {
+    "defaultRegion": "us-east-1",
+    "pollIntervalSeconds": 30,
+    "timezone": "America/Bogota"
+  },
+
+  "apiKeys": {
+    "CHANGE_ME_admin_key": {
+      "name": "Admin Principal",
+      "role": "admin",
+      "accounts": ["*"]
+    }
+  },
+
+  "accounts": [
+    {
+      "id": "principal",
+      "name": "SGB - Admin",
+      "awsAccountId": "111111111111",
+      "region": "us-east-1",
+      "crossAccountRoleArn": null,
+      "instances": [
+        {
+          "id": "SBG-main",
+          "name": "SBG Server",
+          "instanceId": "i-0xxxxxxxxxxxxxxxxx",
+          "description": "Servidor principal de aplicacion",
+          "dashboardPort": 5476,
+          "group": null
+        }
+      ],
+      "groups": []
+    }
+  ]
+}
