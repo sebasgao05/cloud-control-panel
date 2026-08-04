@@ -4,12 +4,17 @@ Handles all API routes for managing EC2 instances across multiple AWS accounts.
 """
 
 import json
+import logging
 import os
 import boto3
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "accounts.json")
 REGION = os.environ.get("AWS_REGION", "us-east-1")
+
+# Structured logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def load_config():
@@ -127,6 +132,7 @@ def lambda_handler(event, context):
     # Authenticate
     user_info = authenticate(event, config)
     if not user_info:
+        logger.warning(f"[AUTH] FAILED ip={event.get('requestContext', {}).get('http', {}).get('sourceIp', 'unknown')} path={path}")
         return response(401, {"error": "Unauthorized"})
 
     # Route matching
@@ -178,11 +184,11 @@ def lambda_handler(event, context):
                     if method == "GET" and action == "status":
                         return handle_instance_status(account, instance)
                     if method == "POST" and action == "start":
-                        return handle_instance_start(account, instance)
+                        return handle_instance_start(account, instance, user_info)
                     if method == "POST" and action == "stop":
-                        return handle_instance_stop(account, instance)
+                        return handle_instance_stop(account, instance, user_info)
                     if method == "POST" and action == "update":
-                        return handle_instance_update(account, instance)
+                        return handle_instance_update(account, instance, user_info)
                     if method == "GET" and action == "dashboard-url":
                         return handle_dashboard_url(account, instance)
 
@@ -198,9 +204,9 @@ def lambda_handler(event, context):
                     if method == "GET" and action == "status":
                         return handle_group_status(account, group)
                     if method == "POST" and action == "start":
-                        return handle_group_start(account, group)
+                        return handle_group_start(account, group, user_info)
                     if method == "POST" and action == "stop":
-                        return handle_group_stop(account, group)
+                        return handle_group_stop(account, group, user_info)
 
         return response(404, {"error": "Not found"})
 
@@ -338,10 +344,11 @@ def handle_instance_status(account, instance):
     })
 
 
-def handle_instance_start(account, instance):
+def handle_instance_start(account, instance, user_info):
     """Start a single instance."""
     ec2 = get_ec2_client(account)
     ec2.start_instances(InstanceIds=[instance["instanceId"]])
+    logger.info(f"[ACTION] user={user_info['name']} action=START instance={instance['instanceId']} name={instance['name']} account={account['id']}")
     return response(200, {
         "message": "Instance starting",
         "instanceId": instance["instanceId"],
@@ -349,10 +356,11 @@ def handle_instance_start(account, instance):
     })
 
 
-def handle_instance_stop(account, instance):
+def handle_instance_stop(account, instance, user_info):
     """Stop a single instance."""
     ec2 = get_ec2_client(account)
     ec2.stop_instances(InstanceIds=[instance["instanceId"]])
+    logger.info(f"[ACTION] user={user_info['name']} action=STOP instance={instance['instanceId']} name={instance['name']} account={account['id']}")
     return response(200, {
         "message": "Instance stopping",
         "instanceId": instance["instanceId"],
@@ -360,7 +368,7 @@ def handle_instance_stop(account, instance):
     })
 
 
-def handle_instance_update(account, instance):
+def handle_instance_update(account, instance, user_info):
     """Trigger update via SSM Run Command."""
     ssm = get_ssm_client(account)
     cmd = ssm.send_command(
@@ -375,6 +383,7 @@ def handle_instance_update(account, instance):
         },
     )
     command_id = cmd["Command"]["CommandId"]
+    logger.info(f"[ACTION] user={user_info['name']} action=UPDATE instance={instance['instanceId']} name={instance['name']} account={account['id']} commandId={command_id}")
     return response(200, {
         "message": "Update started",
         "commandId": command_id,
@@ -447,7 +456,7 @@ def handle_group_status(account, group):
     })
 
 
-def handle_group_start(account, group):
+def handle_group_start(account, group, user_info):
     """Start all instances in a group respecting startOrder."""
     ec2 = get_ec2_client(account)
     start_order = group.get("startOrder", [])
@@ -459,6 +468,7 @@ def handle_group_start(account, group):
             ec2.start_instances(InstanceIds=[inst["instanceId"]])
             started.append({"id": inst["id"], "name": inst["name"], "instanceId": inst["instanceId"]})
 
+    logger.info(f"[ACTION] user={user_info['name']} action=START_GROUP group={group['id']} account={account['id']} members={[s['instanceId'] for s in started]}")
     return response(200, {
         "message": "Group starting",
         "group": group["id"],
@@ -466,7 +476,7 @@ def handle_group_start(account, group):
     })
 
 
-def handle_group_stop(account, group):
+def handle_group_stop(account, group, user_info):
     """Stop all instances in a group respecting stopOrder."""
     ec2 = get_ec2_client(account)
     stop_order = group.get("stopOrder", [])
@@ -478,6 +488,7 @@ def handle_group_stop(account, group):
             ec2.stop_instances(InstanceIds=[inst["instanceId"]])
             stopped.append({"id": inst["id"], "name": inst["name"], "instanceId": inst["instanceId"]})
 
+    logger.info(f"[ACTION] user={user_info['name']} action=STOP_GROUP group={group['id']} account={account['id']} members={[s['instanceId'] for s in stopped]}")
     return response(200, {
         "message": "Group stopping",
         "group": group["id"],
