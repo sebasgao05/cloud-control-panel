@@ -1,0 +1,17 @@
+# Cloud Control Panel - SAM deployment configuration
+# Run: sam build && sam deploy
+# First time: sam deploy --guided
+
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "cloud-control"
+resolve_s3 = true
+s3_prefix = "cloud-control"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_NAMED_IAM"
+parameter_overrides = "StackTag=\"ccp-main\""
+
+[default.build.parameters]
+use_container = false

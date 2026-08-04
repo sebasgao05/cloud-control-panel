@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Control Panel</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+            </div>
+            <h1>Cloud Control Panel</h1>
+            <p>Ingresa tu API Key para continuar</p>
+            <div class="auth-input-wrap">
+                <span class="input-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                </span>
+                <input type="password" id="api-key-input" placeholder="Tu API Key" autofocus>
+            </div>
+            <button class="auth-btn" onclick="authenticate()">Ingresar</button>
+            <label class="remember">
+                <input type="checkbox" id="remember-key" checked> Recordar en este dispositivo
+            </label>
+        </div>
+    </div>
+
+    <!-- Main Screen: Accounts List -->
+    <div id="accounts-screen" class="screen hidden">
+        <header>
+            <div class="header-brand">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+                <h1>Cloud Control</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-name" class="user-badge"></span>
+                <button class="btn-icon" onclick="logout()" title="Cerrar sesion">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <section class="card">
+            <h2>Cuentas</h2>
+            <div id="accounts-list" class="accounts-list">
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Instances Screen: Within an Account -->
+    <div id="instances-screen" class="screen hidden">
+        <header>
+            <button class="btn-back" onclick="goBackToAccounts()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Cuentas
+            </button>
+            <h1 id="account-title">Cuenta</h1>
+            <div class="header-right">
+                <button class="btn-icon" onclick="refreshInstances()" title="Refrescar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </button>
+                <button class="btn-icon" onclick="logout()" title="Cerrar sesion">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Groups Section -->
+        <section id="groups-section" class="card hidden">
+            <h2>Grupos</h2>
+            <div id="groups-list" class="groups-list"></div>
+        </section>
+
+        <!-- Instances Section -->
+        <section class="card">
+            <h2>Instancias</h2>
+            <div id="instances-list" class="instances-list">
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+                <div class="skeleton"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Instance Detail Screen -->
+    <div id="detail-screen" class="screen hidden">
+        <header>
+            <button class="btn-back" onclick="goBackToInstances()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Instancias
+            </button>
+            <h1 id="detail-title">Instancia</h1>
+            <div class="header-right">
+                <button class="btn-icon" onclick="refreshInstanceDetail()" title="Refrescar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Status Card -->
+        <section id="detail-status-card" class="card status-card">
+            <div class="status-header">
+                <span id="detail-indicator" class="indicator stopped"></span>
+                <span id="detail-status-text">Consultando...</span>
+            </div>
+            <div class="status-details">
+                <div class="detail">
+                    <span class="label">IP Publica</span>
+                    <span id="detail-public-ip" class="value mono">--</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Uptime</span>
+                    <span id="detail-uptime" class="value">--</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Instance ID</span>
+                    <span id="detail-instance-id" class="value mono">--</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Descripcion</span>
+                    <span id="detail-description" class="value">--</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Actions Card -->
+        <section class="card">
+            <h2>Acciones</h2>
+            <div class="actions">
+                <button id="detail-btn-start" class="btn btn-start" onclick="startCurrentInstance()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Encender
+                </button>
+                <button id="detail-btn-stop" class="btn btn-stop" onclick="stopCurrentInstance()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    Apagar
+                </button>
+                <button id="detail-btn-update" class="btn btn-update" onclick="updateCurrentInstance()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Actualizar
+                </button>
+                <button id="detail-btn-dashboard" class="btn btn-dashboard" onclick="openCurrentDashboard()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    Dashboard
+                </button>
+            </div>
+        </section>
+
+        <!-- Activity Log -->
+        <section class="card">
+            <h2>Actividad</h2>
+            <div id="detail-activity-log" class="activity-log">
+                <div class="empty-state">
+                    <svg class="empty-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <p class="empty-text">Sin actividad reciente</p>
+                    <p class="empty-hint">Las acciones se registraran aqui</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

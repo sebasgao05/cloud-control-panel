@@ -1,0 +1,77 @@
+{
+  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias. Editado solo por admin.",
+
+  "settings": {
+    "defaultRegion": "us-east-1",
+    "pollIntervalSeconds": 30,
+    "timezone": "America/Bogota"
+  },
+
+  "apiKeys": {
+    "CHANGE_ME_admin_key": {
+      "name": "Admin Principal",
+      "role": "admin",
+      "accounts": ["*"]
+    },
+    "CHANGE_ME_operator_key": {
+      "name": "Operador Sanidad",
+      "role": "operator",
+      "accounts": ["sanidad"]
+    }
+  },
+
+  "accounts": [
+    {
+      "id": "sanidad",
+      "name": "SAN - TEST - Sanidad Wisse",
+      "awsAccountId": "111111111111",
+      "region": "us-east-1",
+      "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
+      "instances": [
+        {
+          "id": "san-app-server",
+          "name": "App Server",
+          "instanceId": "i-0xxxxxxxxxxxxxxxxx",
+          "description": "Servidor principal de aplicacion",
+          "dashboardPort": 5476,
+          "group": "sanidad-core"
+        },
+        {
+          "id": "san-db-server",
+          "name": "DB Server",
+          "instanceId": "i-0yyyyyyyyyyyyyyyyy",
+          "description": "Servidor de base de datos",
+          "dashboardPort": null,
+          "group": "sanidad-core"
+        }
+      ],
+      "groups": [
+        {
+          "id": "sanidad-core",
+          "name": "Core Sanidad",
+          "description": "Infraestructura principal Sanidad (se encienden/apagan juntas)",
+          "startOrder": ["san-db-server", "san-app-server"],
+          "stopOrder": ["san-app-server", "san-db-server"]
+        }
+      ]
+    },
+    {
+      "id": "nuvu-10",
+      "name": "NUV - PROD - Nuvu Account 10",
+      "awsAccountId": "222222222222",
+      "region": "us-east-1",
+      "crossAccountRoleArn": "arn:aws:iam::222222222222:role/CloudControlRemoteAccess",
+      "instances": [
+        {
+          "id": "nuvu-main",
+          "name": "Main Server",
+          "instanceId": "i-0zzzzzzzzzzzzzzzzz",
+          "description": "Servidor principal Nuvu",
+          "dashboardPort": 5476,
+          "group": null
+        }
+      ],
+      "groups": []
+    }
+  ]
+}
