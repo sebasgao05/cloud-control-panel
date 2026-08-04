@@ -22,10 +22,19 @@ Usuario -> CloudFront -> S3 (frontend)
 
 ## Inicio rapido
 
-### 1. Configurar
+### 1. Configurar cuentas e instancias
 
-Edita `config/accounts.json` con tus cuentas, instancias y API keys.
-Ver [docs/configuration.md](docs/configuration.md) para detalles.
+**Multi-cuenta** (varias cuentas AWS con roles cross-account):
+```bash
+copy config\accounts.example.json config\accounts.json
+```
+
+**Mono-cuenta** (una sola cuenta AWS):
+```bash
+copy config\accountsMono.example.json config\accounts.json
+```
+
+Edita `config/accounts.json` con tus datos reales (instance IDs, account IDs, ARNs, API keys).
 
 ### 2. (Solo multi-cuenta) Crear roles remotos
 
@@ -42,6 +51,8 @@ Ver [docs/cross-account-setup.md](docs/cross-account-setup.md).
 
 Ingresa al URL que devuelve el deploy con tu API key configurada.
 
+> **Nota:** `config/accounts.json` está en `.gitignore` y NO se commitea. Solo los archivos `.example` se versionan como referencia.
+
 ## Desarrollo local (Mock)
 
 ```bash
@@ -54,24 +65,26 @@ python mock/server.py
 
 ```
 config/
-  accounts.json          <- Configuracion de cuentas, instancias, keys (admin edita aqui)
+  accounts.example.json            <- Plantilla multi-cuenta (referencia)
+  accountsMono.example.json        <- Plantilla mono-cuenta (referencia)
+  accounts.json                    <- Config real de cuentas (NO se commitea)
 backend/
-  app.py                 <- Lambda handler (multi-account)
+  app.py                           <- Lambda handler (multi-account)
 frontend/
-  index.html             <- SPA del panel de control
-  app.js                 <- Logica frontend
-  style.css              <- Estilos
+  index.html                       <- SPA del panel de control
+  app.js                           <- Logica frontend
+  style.css                        <- Estilos
 mock/
-  server.py              <- Servidor mock para desarrollo local
+  server.py                        <- Servidor mock para desarrollo local
 docs/
-  architecture.md        <- Arquitectura del sistema
-  admin-guide.md         <- Guia para administradores
-  user-guide.md          <- Guia para usuarios
-  configuration.md       <- Referencia de configuracion
-  cross-account-setup.md <- Setup cross-account
-  architecture-diagram.drawio <- Diagrama visual
-template.yaml            <- CloudFormation/SAM template
-deploy.ps1               <- Script de despliegue
+  architecture.md                  <- Arquitectura del sistema
+  admin-guide.md                   <- Guia para administradores
+  user-guide.md                    <- Guia para usuarios
+  configuration.md                 <- Referencia de configuracion
+  cross-account-setup.md           <- Setup cross-account
+  architecture-diagram.drawio      <- Diagrama visual
+template.yaml                      <- CloudFormation/SAM template
+deploy.ps1                         <- Script de despliegue
 ```
 
 ## Agregar una cuenta o instancia

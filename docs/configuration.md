@@ -2,10 +2,34 @@
 
 ## Archivo de configuracion
 
-Toda la configuracion vive en `config/accounts.json`. Este archivo se empaqueta
-con la Lambda en cada deploy.
+Toda la configuracion (cuentas, instancias, API keys) vive en un solo archivo: `config/accounts.json`.
+Este archivo se empaqueta con la Lambda en cada deploy.
 
-## Estructura
+| Archivo | Contenido | Commitear? |
+|---------|-----------|------------|
+| `config/accounts.example.json` | Plantilla multi-cuenta (referencia) | SI |
+| `config/accountsMono.example.json` | Plantilla mono-cuenta (referencia) | SI |
+| `config/accounts.json` | Config real (cuentas, keys, instancias) | **NO** (está en .gitignore) |
+
+## Setup inicial
+
+Segun tu caso, copia la plantilla correspondiente:
+
+**Multi-cuenta** (varias cuentas AWS, roles cross-account):
+```bash
+copy config\accounts.example.json config\accounts.json
+```
+
+**Mono-cuenta** (una sola cuenta AWS, sin roles remotos):
+```bash
+copy config\accountsMono.example.json config\accounts.json
+```
+
+Luego edita `config/accounts.json` con tus datos reales (IDs de instancias, ARNs, API keys, etc).
+
+---
+
+## Estructura del archivo
 
 ```json
 {
@@ -28,6 +52,7 @@ con la Lambda en cada deploy.
 ## API Keys
 
 Cada key permite acceso al panel. Puedes tener 1 o N keys.
+Las keys van directamente en `config/accounts.json`.
 
 ```json
 "apiKeys": {
@@ -99,39 +124,26 @@ Cada cuenta agrupa instancias y opcionalmente grupos.
 - `startOrder`: orden en que se encienden (DB primero, app despues)
 - `stopOrder`: orden en que se apagan (app primero, DB despues)
 
+---
+
 ## Flujo de trabajo para cambios
 
 1. Editar `config/accounts.json`
 2. Ejecutar `.\deploy.ps1`
 3. Listo - la Lambda toma la nueva configuracion
 
-## Ejemplos
+## Seguridad
 
-### Mono-cuenta (1 cuenta, 1 instancia)
-```json
-{
-  "settings": { "defaultRegion": "us-east-1" },
-  "apiKeys": {
-    "mi-super-key": { "name": "Admin", "role": "admin", "accounts": ["*"] }
-  },
-  "accounts": [{
-    "id": "principal",
-    "name": "Mi Cuenta",
-    "awsAccountId": "123456789012",
-    "region": "us-east-1",
-    "crossAccountRoleArn": null,
-    "instances": [{
-      "id": "server-1",
-      "name": "Servidor Principal",
-      "instanceId": "i-0abc123",
-      "description": "Mi servidor",
-      "dashboardPort": 5476,
-      "group": null
-    }],
-    "groups": []
-  }]
-}
-```
+- **NUNCA commitear** `config/accounts.json` (contiene API keys y datos sensibles)
+- El archivo está en `.gitignore` por defecto
+- Solo los archivos `.example` se versionan como referencia
+- Las API keys deben ser strings largos y aleatorios en produccion
 
-### Multi-cuenta (2 cuentas, varias instancias, 1 grupo)
-Ver el archivo `config/accounts.json` incluido como ejemplo.
+## Mono-cuenta vs Multi-cuenta
+
+La logica del backend es la misma. La diferencia es solo configuracion:
+
+- **Mono-cuenta**: `crossAccountRoleArn` es `null` → Lambda usa sus propias credenciales
+- **Multi-cuenta**: `crossAccountRoleArn` tiene un ARN → Lambda hace `STS AssumeRole` para operar en la cuenta remota
+
+No hay un flag o modo especial. Simplemente configura las cuentas con o sin ARN de rol.

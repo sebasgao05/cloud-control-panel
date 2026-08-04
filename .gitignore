@@ -14,8 +14,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Secrets (never commit your API key)
-.env
+# Configuracion real de cuentas (contiene datos sensibles - API keys, instance IDs, ARNs)
+config/accounts.json
+config/accountsMono.json
 
 # Bundled config in backend (generated during deploy)
 backend/accounts.json

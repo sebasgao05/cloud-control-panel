@@ -90,7 +90,17 @@ async function loadAccounts() {
     try {
         const data = await api("GET", "/accounts");
         document.getElementById("user-name").textContent = data.user || "";
-        renderAccounts(data.accounts || []);
+        const accounts = data.accounts || [];
+
+        // Always render the accounts list (so "back to accounts" works)
+        renderAccounts(accounts);
+
+        if (accounts.length === 1) {
+            // Single account: skip accounts screen, go directly to instances
+            openAccount(accounts[0].id, accounts[0].name);
+            return;
+        }
+
         showScreen("accounts-screen");
     } catch (e) {
         if (e.message !== "Unauthorized") {
@@ -110,11 +120,6 @@ function renderAccounts(accounts) {
                 <p class="empty-hint">Edita config/accounts.json para agregar cuentas</p>
             </div>
         `;
-        return;
-    }
-
-    if (accounts.length === 1) {
-        openAccount(accounts[0].id, accounts[0].name);
         return;
     }
 
