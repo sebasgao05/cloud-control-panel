@@ -2,34 +2,18 @@
 
 ## Archivo de configuracion
 
-Toda la configuracion (cuentas, instancias, API keys) vive en un solo archivo: `config/accounts.json`.
+Toda la configuracion vive en un solo archivo: `config/accounts.json`.
 Este archivo se empaqueta con la Lambda en cada deploy.
 
 | Archivo | Contenido | Commitear? |
 |---------|-----------|------------|
 | `config/accounts.example.json` | Plantilla multi-cuenta (referencia) | SI |
 | `config/accountsMono.example.json` | Plantilla mono-cuenta (referencia) | SI |
-| `config/accounts.json` | Config real (cuentas, keys, instancias) | **NO** (está en .gitignore) |
-
-## Setup inicial
-
-Segun tu caso, copia la plantilla correspondiente:
-
-**Multi-cuenta** (varias cuentas AWS, roles cross-account):
-```bash
-copy config\accounts.example.json config\accounts.json
-```
-
-**Mono-cuenta** (una sola cuenta AWS, sin roles remotos):
-```bash
-copy config\accountsMono.example.json config\accounts.json
-```
-
-Luego edita `config/accounts.json` con tus datos reales (IDs de instancias, ARNs, API keys, etc).
+| `config/accounts.json` | Config real (cuentas, keys, instancias) | **NO** (.gitignore) |
 
 ---
 
-## Estructura del archivo
+## Estructura completa del archivo
 
 ```json
 {
@@ -38,6 +22,8 @@ Luego edita `config/accounts.json` con tus datos reales (IDs de instancias, ARNs
   "accounts": [ ... ]
 }
 ```
+
+---
 
 ## Settings
 
@@ -49,32 +35,51 @@ Luego edita `config/accounts.json` con tus datos reales (IDs de instancias, ARNs
 }
 ```
 
-## API Keys
+---
 
-Cada key permite acceso al panel. Puedes tener 1 o N keys.
-Las keys van directamente en `config/accounts.json`.
+## API Keys
 
 ```json
 "apiKeys": {
-  "tu-key-secreta-aqui": {
-    "name": "Nombre del usuario/equipo",
+  "key-admin-secreta": {
+    "name": "Admin Principal",
     "role": "admin",
     "accounts": ["*"]
   },
-  "otra-key-limitada": {
-    "name": "Equipo X",
+  "key-operador": {
+    "name": "Equipo Desarrollo",
     "role": "operator",
-    "accounts": ["sanidad"]
+    "accounts": ["sanidad", "nuvu-10"],
+    "scheduler": {
+      "view": true,
+      "edit": false
+    }
   }
 }
 ```
 
-- `role`: "admin" o "operator" (mismo acceso por ahora, preparado para futuro)
-- `accounts`: lista de IDs de cuenta a los que tiene acceso, o ["*"] para todas
+### Campos
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `name` | string | Nombre visible en el panel |
+| `role` | string | `"admin"` o `"operator"` |
+| `accounts` | array | IDs de cuentas permitidas, o `["*"]` para todas |
+| `scheduler` | object | (Opcional) Permisos del scheduler para operadores |
+| `scheduler.view` | boolean | Si puede ver los horarios |
+| `scheduler.edit` | boolean | Si puede crear/editar reglas (implica view) |
+
+### Reglas de permisos
+
+- **Admin**: Siempre ve y edita todo (scheduler, notificaciones, costos)
+- **Operador sin `scheduler`**: No ve el scheduler
+- **Operador con `edit: true`**: Ve y edita (no necesita `view: true`)
+- **Operador con `view: true, edit: false`**: Solo lectura
+- Notificaciones y costos: Solo visibles para admin
+
+---
 
 ## Accounts
-
-Cada cuenta agrupa instancias y opcionalmente grupos.
 
 ```json
 {
@@ -83,46 +88,157 @@ Cada cuenta agrupa instancias y opcionalmente grupos.
   "awsAccountId": "111111111111",
   "region": "us-east-1",
   "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
-  "instances": [...],
-  "groups": [...]
+  "features": {
+    "scheduler": true,
+    "notifications": true,
+    "costEstimate": true
+  },
+  "notifications": { ... },
+  "schedule": { ... },
+  "instances": [ ... ],
+  "groups": [ ... ]
 }
 ```
 
-- `id`: identificador unico (slug, sin espacios)
-- `crossAccountRoleArn`: null si es la misma cuenta donde se despliega la Lambda
+### Campos
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `id` | string | Slug unico (sin espacios) |
+| `name` | string | Nombre visible |
+| `awsAccountId` | string | ID de la cuenta AWS |
+| `region` | string | Region AWS |
+| `crossAccountRoleArn` | string/null | ARN del rol remoto (null si es cuenta local) |
+| `features` | object | Features habilitados para esta cuenta |
+
+### Features disponibles
+
+| Feature | Descripcion |
+|---------|-------------|
+| `scheduler` | Habilita programacion automatica |
+| `notifications` | Habilita canales de notificacion |
+| `costEstimate` | Habilita estimacion de costos |
+
+---
 
 ## Instances
 
 ```json
 {
-  "id": "san-app-server",
+  "id": "app-server",
   "name": "App Server",
-  "instanceId": "i-0abc123def456",
-  "description": "Servidor principal",
+  "instanceId": "i-0abc123def456789",
+  "instanceType": "t3.medium",
+  "description": "Servidor principal de aplicacion",
   "dashboardPort": 5476,
-  "group": "sanidad-core"
+  "group": "core-servers"
 }
 ```
 
-- `id`: identificador unico dentro de la cuenta
-- `instanceId`: ID real de la instancia EC2
-- `dashboardPort`: puerto del dashboard (null si no tiene)
-- `group`: ID del grupo al que pertenece (null si es independiente)
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `id` | string | Slug unico dentro de la cuenta |
+| `name` | string | Nombre visible |
+| `instanceId` | string | ID real de EC2 (empieza con i-) |
+| `instanceType` | string | Tipo EC2 (para estimacion de costos) |
+| `description` | string | Texto descriptivo |
+| `dashboardPort` | number/null | Puerto del dashboard (null si no tiene) |
+| `group` | string/null | ID del grupo (null si es independiente) |
+
+---
 
 ## Groups
 
 ```json
 {
-  "id": "sanidad-core",
-  "name": "Core Sanidad",
-  "description": "Se encienden/apagan juntas",
-  "startOrder": ["san-db-server", "san-app-server"],
-  "stopOrder": ["san-app-server", "san-db-server"]
+  "id": "core-servers",
+  "name": "Core",
+  "description": "Se encienden y apagan juntas",
+  "color": "#6366f1",
+  "startOrder": ["db-server", "app-server", "web-server"],
+  "stopOrder": ["web-server", "app-server", "db-server"]
 }
 ```
 
-- `startOrder`: orden en que se encienden (DB primero, app despues)
-- `stopOrder`: orden en que se apagan (app primero, DB despues)
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `id` | string | Slug unico |
+| `name` | string | Nombre visible |
+| `description` | string | Descripcion del grupo |
+| `color` | string | Color hex para la etiqueta visual |
+| `startOrder` | array | Orden de encendido (IDs de instancias) |
+| `stopOrder` | array | Orden de apagado (IDs de instancias) |
+
+---
+
+## Schedule
+
+```json
+"schedule": {
+  "timezone": "America/Bogota",
+  "rules": [
+    {
+      "id": "rule-1",
+      "instances": ["app-server", "db-server"],
+      "startCron": "0 7 * * 1-5",
+      "stopCron": "0 20 * * 1-5",
+      "description": "L-V 7am a 8pm",
+      "enabled": true
+    }
+  ]
+}
+```
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `timezone` | string | Zona horaria para las reglas |
+| `rules[].id` | string | ID unico de la regla |
+| `rules[].instances` | array | IDs de instancias afectadas |
+| `rules[].startCron` | string | Cron de encendido (min hour * * dow) |
+| `rules[].stopCron` | string | Cron de apagado |
+| `rules[].description` | string | Descripcion legible |
+| `rules[].enabled` | boolean | Si la regla esta activa |
+
+---
+
+## Notifications
+
+```json
+"notifications": {
+  "channels": [
+    {
+      "id": "ch-1",
+      "type": "email",
+      "name": "Admin Email",
+      "config": {
+        "to": "admin@empresa.com",
+        "smtpHost": "smtp.gmail.com",
+        "smtpPort": 587,
+        "smtpUser": "alerts@empresa.com"
+      },
+      "events": ["started", "stopped", "error"],
+      "enabled": true
+    }
+  ]
+}
+```
+
+### Tipos de canal
+
+| Tipo | Campos config requeridos |
+|------|-------------------------|
+| `email` | `to`, `smtpHost`, `smtpPort`, `smtpUser` |
+| `telegram` | `botToken`, `chatId` |
+| `teams` | `webhookUrl` |
+
+### Eventos
+
+| Evento | Descripcion |
+|--------|-------------|
+| `started` | Instancia encendida |
+| `stopped` | Instancia apagada |
+| `error` | Error en operacion |
+| `scheduler_executed` | Scheduler ejecuto una regla |
 
 ---
 
@@ -130,20 +246,11 @@ Cada cuenta agrupa instancias y opcionalmente grupos.
 
 1. Editar `config/accounts.json`
 2. Ejecutar `.\deploy.ps1`
-3. Listo - la Lambda toma la nueva configuracion
+3. Listo — la Lambda toma la nueva configuracion
 
 ## Seguridad
 
-- **NUNCA commitear** `config/accounts.json` (contiene API keys y datos sensibles)
-- El archivo está en `.gitignore` por defecto
-- Solo los archivos `.example` se versionan como referencia
+- **NUNCA commitear** `config/accounts.json` (contiene API keys)
+- El archivo esta en `.gitignore` por defecto
 - Las API keys deben ser strings largos y aleatorios en produccion
-
-## Mono-cuenta vs Multi-cuenta
-
-La logica del backend es la misma. La diferencia es solo configuracion:
-
-- **Mono-cuenta**: `crossAccountRoleArn` es `null` → Lambda usa sus propias credenciales
-- **Multi-cuenta**: `crossAccountRoleArn` tiene un ARN → Lambda hace `STS AssumeRole` para operar en la cuenta remota
-
-No hay un flag o modo especial. Simplemente configura las cuentas con o sin ARN de rol.
+- Genera keys con: `openssl rand -hex 24`

@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Cloud Control Panel - Multi-account, multi-instance serverless management.
-  CloudFront + S3 (frontend) + API Gateway HTTP API + Lambda (backend).
+  CloudFront + S3 (frontend) + API Gateway HTTP API + Lambda (backend) + DynamoDB (config).
   Supports multiple AWS accounts via cross-account IAM roles.
 
 Parameters:
@@ -11,6 +11,24 @@ Parameters:
     Description: Unique tag for naming resources
 
 Resources:
+  # ─── DynamoDB: Config Store ───────────────────────────────────────────
+
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "cloud-control-config-${StackTag}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
   # ─── Backend: Lambda ──────────────────────────────────────────────────
 
   ControlFunctionRole:
@@ -31,7 +49,7 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # EC2 operations (local account instances)
+              # EC2 operations
               - Effect: Allow
                 Action:
                   - ec2:StartInstances
@@ -49,6 +67,58 @@ Resources:
                 Action:
                   - sts:AssumeRole
                 Resource: "arn:aws:iam::*:role/CloudControlRemoteAccess"
+              # DynamoDB access
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:BatchGetItem
+                Resource:
+                  - !GetAtt ConfigTable.Arn
+              # EventBridge Scheduler
+              - Effect: Allow
+                Action:
+                  - scheduler:CreateSchedule
+                  - scheduler:UpdateSchedule
+                  - scheduler:DeleteSchedule
+                  - scheduler:GetSchedule
+                  - scheduler:ListSchedules
+                Resource: "*"
+              # Pass role (for scheduler to invoke Lambda)
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt SchedulerExecutionRole.Arn
+
+  # ─── EventBridge Scheduler Role (allows scheduler to invoke Lambda) ──
+
+  SchedulerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cloud-control-scheduler-${StackTag}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-lambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloud-control-${StackTag}"
 
   ControlFunction:
     Type: AWS::Lambda::Function
@@ -65,6 +135,9 @@ Resources:
       Environment:
         Variables:
           STACK_TAG: !Ref StackTag
+          CONFIG_TABLE: !Ref ConfigTable
+          SCHEDULER_ROLE_ARN: !GetAtt SchedulerExecutionRole.Arn
+          LAMBDA_ARN: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloud-control-${StackTag}"
 
   # ─── HTTP API (API Gateway v2) ───────────────────────────────────────
 
@@ -80,6 +153,7 @@ Resources:
           - GET
           - POST
           - PUT
+          - DELETE
           - OPTIONS
         AllowHeaders:
           - Content-Type
@@ -218,3 +292,7 @@ Outputs:
   DistributionId:
     Description: CloudFront distribution ID
     Value: !Ref Distribution
+
+  ConfigTableName:
+    Description: DynamoDB config table name
+    Value: !Ref ConfigTable
