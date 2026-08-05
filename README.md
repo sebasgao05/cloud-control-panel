@@ -6,8 +6,11 @@ Panel de control serverless para gestionar instancias EC2 en una o multiples cue
 
 - Multi-cuenta: Gestiona instancias en diferentes cuentas AWS desde un solo panel
 - Multi-instancia: Controla N instancias por cuenta
-- Grupos: Agrupa instancias para encender/apagar juntas con orden definido
-- API Keys con permisos: Cada key ve solo las cuentas asignadas
+- Grupos: Agrupa instancias para encender/apagar juntas con orden definido y colores personalizados
+- Scheduler: Programacion automatica de encendido/apagado con selector visual de dias y horas
+- Notificaciones: Alertas por Email (SMTP), Telegram y Microsoft Teams
+- Estimacion de costos: Seguimiento de uptime y costo estimado por instancia
+- API Keys con permisos: Cada key ve solo las cuentas asignadas, con permisos granulares
 - Estado en tiempo real: Visualizacion del estado de cada instancia
 - Cross-account: Usa roles IAM para operar instancias en cuentas remotas
 - Serverless: Lambda + API Gateway + CloudFront + S3
@@ -18,6 +21,7 @@ Panel de control serverless para gestionar instancias EC2 en una o multiples cue
 Usuario -> CloudFront -> S3 (frontend)
                       -> API Gateway -> Lambda -> EC2 (misma cuenta)
                                                -> STS AssumeRole -> EC2 (cuenta remota)
+                                               -> EventBridge Scheduler (programacion)
 ```
 
 ## Inicio rapido
@@ -58,8 +62,15 @@ Ingresa al URL que devuelve el deploy con tu API key configurada.
 ```bash
 python mock/server.py
 # Abre http://localhost:8080
-# API Key: demo
 ```
+
+### API Keys de prueba
+
+| Key | Rol | Acceso |
+|-----|-----|--------|
+| `demo` | Admin | Ve todo, edita scheduler, notificaciones y costos |
+| `sanidad-key` | Operador | Solo cuenta Sanidad, ve scheduler (no edita) |
+| `nuvu-key` | Operador | Solo cuenta Nuvu, sin acceso a scheduler |
 
 ## Estructura
 
@@ -82,10 +93,29 @@ docs/
   user-guide.md                    <- Guia para usuarios
   configuration.md                 <- Referencia de configuracion
   cross-account-setup.md           <- Setup cross-account
+  ROADMAP.md                       <- Propuestas futuras
   architecture-diagram.drawio      <- Diagrama visual
 template.yaml                      <- CloudFormation/SAM template
 deploy.ps1                         <- Script de despliegue
 ```
+
+## Features configurables
+
+El admin habilita features por cuenta en `accounts.json`:
+
+```json
+"features": {
+  "scheduler": true,
+  "notifications": true,
+  "costEstimate": true
+}
+```
+
+| Feature | Descripcion |
+|---------|-------------|
+| `scheduler` | Programacion automatica de encendido/apagado |
+| `notifications` | Alertas por email, Telegram o Teams |
+| `costEstimate` | Estimacion de costos basada en uptime real |
 
 ## Agregar una cuenta o instancia
 
@@ -97,6 +127,7 @@ deploy.ps1                         <- Script de despliegue
 
 - API keys definidas en config (no en UI)
 - Cada key tiene acceso solo a cuentas especificas
+- Permisos granulares por key (scheduler view/edit)
 - Cross-account con roles IAM de minimo privilegio
 - Frontend servido via CloudFront (HTTPS)
 - No hay base de datos - todo es config-as-code

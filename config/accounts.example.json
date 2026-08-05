@@ -16,7 +16,11 @@
     "CHANGE_ME_operator_key": {
       "name": "Operador paridad",
       "role": "operator",
-      "accounts": ["paridad"]
+      "accounts": ["paridad"],
+      "scheduler": {
+        "view": true,
+        "edit": false
+      }
     }
   },
 
@@ -27,11 +31,47 @@
       "awsAccountId": "111111111111",
       "region": "us-east-1",
       "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
+      "features": {
+        "scheduler": true,
+        "notifications": true,
+        "costEstimate": true
+      },
+      "notifications": {
+        "channels": [
+          {
+            "id": "ch-1",
+            "type": "email",
+            "name": "Admin Email",
+            "config": {
+              "to": "admin@empresa.com",
+              "smtpHost": "smtp.gmail.com",
+              "smtpPort": 587,
+              "smtpUser": "alerts@empresa.com"
+            },
+            "events": ["started", "stopped", "error"],
+            "enabled": true
+          }
+        ]
+      },
+      "schedule": {
+        "timezone": "America/Bogota",
+        "rules": [
+          {
+            "id": "rule-1",
+            "instances": ["par-app-server", "par-db-server"],
+            "startCron": "0 7 * * 1-5",
+            "stopCron": "0 20 * * 1-5",
+            "description": "L-V 7am a 8pm",
+            "enabled": true
+          }
+        ]
+      },
       "instances": [
         {
           "id": "par-app-server",
           "name": "App Server",
           "instanceId": "i-0xxxxxxxxxxxxxxxxx",
+          "instanceType": "t3.medium",
           "description": "Servidor principal de aplicacion",
           "dashboardPort": 5476,
           "group": "paridad-core"
@@ -40,6 +80,7 @@
           "id": "par-db-server",
           "name": "DB Server",
           "instanceId": "i-0yyyyyyyyyyyyyyyyy",
+          "instanceType": "r5.large",
           "description": "Servidor de base de datos",
           "dashboardPort": null,
           "group": "paridad-core"
@@ -50,6 +91,7 @@
           "id": "paridad-core",
           "name": "Core paridad",
           "description": "Infraestructura principal paridad (se encienden/apagan juntas)",
+          "color": "#6366f1",
           "startOrder": ["par-db-server", "par-app-server"],
           "stopOrder": ["par-app-server", "par-db-server"]
         }
@@ -61,11 +103,17 @@
       "awsAccountId": "222222222222",
       "region": "us-east-1",
       "crossAccountRoleArn": "arn:aws:iam::222222222222:role/CloudControlRemoteAccess",
+      "features": {
+        "scheduler": false,
+        "notifications": false,
+        "costEstimate": true
+      },
       "instances": [
         {
           "id": "SBG-main",
           "name": "Main Server",
           "instanceId": "i-0zzzzzzzzzzzzzzzzz",
+          "instanceType": "t3.large",
           "description": "Servidor principal SBG",
           "dashboardPort": 5476,
           "group": null

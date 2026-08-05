@@ -29,32 +29,43 @@ cuentas a las que tienes acceso.
 
 ---
 
-## 3. Pantalla de Instancias
+## 3. Pantalla de Cuenta (Grupos e Instancias)
 
-Aqui ves todas las instancias de la cuenta seleccionada.
-
-### Estados posibles
-
-| Indicador | Estado | Significado |
-|-----------|--------|-------------|
-| Verde | running | La instancia esta encendida y funcionando |
-| Rojo | stopped | La instancia esta apagada |
-| Amarillo | pending | La instancia se esta encendiendo |
-| Amarillo | stopping | La instancia se esta apagando |
+Al entrar a una cuenta ves dos secciones:
 
 ### Grupos
 
-Si hay instancias agrupadas, veras una seccion "Grupos" arriba con botones:
-- Encender: Enciende TODAS las instancias del grupo en orden
-- Apagar: Apaga TODAS las instancias del grupo en orden
+Si hay instancias agrupadas, aparecen como tarjetas con un color lateral.
+Haz click en un grupo para:
+- Ver las instancias que lo componen
+- Encender o apagar todo el grupo con un solo boton
 
-### Instancias individuales
+### Instancias independientes
 
-Haz click en una instancia para ver su detalle y acciones.
+Debajo de los grupos aparecen las instancias que no pertenecen a ningun grupo.
+Haz click en una para ver su detalle y acciones.
+
+### Boton de Configuracion (⚙️)
+
+Si tienes permisos, veras un icono de engranaje en la esquina superior derecha.
+Al hacer click se abre un panel lateral con:
+
+- **Programacion**: Horarios automaticos de encendido/apagado (si tienes permiso)
+- **Notificaciones**: Canales de alerta configurados (solo admin)
+- **Costos estimados**: Gasto acumulado por instancia (solo admin)
 
 ---
 
-## 4. Pantalla de Detalle
+## 4. Pantalla de Grupo
+
+Al hacer click en un grupo ves:
+- Botones para encender/apagar todo el grupo
+- Lista de instancias del grupo con su estado actual
+- Haz click en cualquier instancia para ver su detalle
+
+---
+
+## 5. Pantalla de Detalle
 
 Aqui ves el estado completo de una instancia y puedes realizar acciones.
 
@@ -78,33 +89,51 @@ Aqui ves el estado completo de una instancia y puedes realizar acciones.
 
 - Los botones se habilitan/deshabilitan segun el estado actual
 - El estado se refresca automaticamente cada 30 segundos
-- Puedes refrescar manualmente con el boton de recarga en la esquina superior
+- Puedes refrescar manualmente con el boton de recarga
 
 ---
 
-## 5. Actividad
+## 6. Programacion (Scheduler)
 
-En la parte inferior de la pantalla de detalle hay un log de actividad
-que muestra las acciones que realizaste durante la sesion actual.
+Si tu admin te dio permiso de ver el scheduler, desde el panel de configuracion (⚙️)
+podras ver los horarios programados de encendido y apagado.
+
+- Cada regla muestra: descripcion, hora de encendido, hora de apagado, dias activos e instancias afectadas
+- Las reglas pueden estar activas o inactivas
+- Si tienes permiso de edicion podras crear, modificar y eliminar reglas
 
 ---
 
-## 6. Preguntas Frecuentes
+## 7. Estados de instancias
 
-P: La instancia dice "running" pero no puedo acceder al dashboard
+| Indicador | Estado | Significado |
+|-----------|--------|-------------|
+| Verde | running | La instancia esta encendida y funcionando |
+| Rojo | stopped | La instancia esta apagada |
+| Amarillo | pending | La instancia se esta encendiendo |
+| Amarillo | stopping | La instancia se esta apagando |
+
+---
+
+## 8. Preguntas Frecuentes
+
+**P: La instancia dice "running" pero no puedo acceder al dashboard**
 R: Puede tardar 1-2 minutos despues de encender para que los servicios esten listos.
 
-P: Encendi la instancia pero sigue en "pending"
+**P: Encendi la instancia pero sigue en "pending"**
 R: Es normal, el encendido tarda 20-60 segundos. Se actualizara automaticamente.
 
-P: No veo una cuenta que deberia ver
+**P: No veo una cuenta que deberia ver**
 R: Tu API Key puede no tener permisos para esa cuenta. Contacta a tu admin.
 
-P: El boton "Dashboard" esta deshabilitado
-R: Solo funciona cuando la instancia esta en estado "running" y tiene dashboard configurado.
+**P: No veo el boton de configuracion (⚙️)**
+R: Solo aparece si tienes acceso a scheduler, notificaciones o costos.
 
-P: Como cierro sesion?
+**P: No puedo editar el scheduler**
+R: Tu key puede tener permiso de solo lectura. Contacta a tu admin.
+
+**P: El boton "Dashboard" esta deshabilitado**
+R: Solo funciona cuando la instancia esta "running" y tiene dashboard configurado.
+
+**P: Como cierro sesion?**
 R: Click en el icono de salida en la esquina superior derecha.
-
-P: Olvide mi API Key
-R: Contacta a tu administrador para que te la proporcione nuevamente.

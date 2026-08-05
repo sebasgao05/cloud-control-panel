@@ -1,5 +1,5 @@
 {
-  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias. Editado solo por admin.",
+  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias.",
 
   "settings": {
     "defaultRegion": "us-east-1",
@@ -8,65 +8,53 @@
   },
 
   "apiKeys": {
-    "CHANGE_ME_admin_key": {
-      "name": "Admin Principal",
-      "role": "admin",
+    "303e378f-dc8b-4ac4-83df-0d497f40d5f9": {
+      "name": "Admin",
+      "role": "superadmin",
       "accounts": ["*"]
-    },
-    "CHANGE_ME_operator_key": {
-      "name": "Operador Sanidad",
-      "role": "operator",
-      "accounts": ["sanidad"]
     }
   },
 
   "accounts": [
     {
-      "id": "sanidad",
-      "name": "SAN - TEST - Sanidad Wisse",
-      "awsAccountId": "111111111111",
+      "id": "principal",
+      "name": "SebasGao05",
+      "awsAccountId": "009245113723",
       "region": "us-east-1",
-      "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
+      "crossAccountRoleArn": null,
+      "features": {
+        "scheduler": true,
+        "notifications": true,
+        "costEstimate": true
+      },
+      "schedule": {
+        "timezone": "America/Bogota",
+        "rules": []
+      },
+      "notifications": {
+        "channels": [
+          {
+            "id": "ch-gmail",
+            "type": "email",
+            "name": "Gmail Admin",
+            "config": {
+              "to": "sebasgao05@icloud.com",
+              "smtpHost": "smtp.gmail.com",
+              "smtpPort": 587,
+              "smtpUser": "sebasgao05@gmail.com",
+              "smtpPass": "bvuf bpkg kksp njaw"
+            },
+            "events": ["started", "stopped", "error"],
+            "enabled": true
+          }
+        ]
+      },
       "instances": [
         {
-          "id": "san-app-server",
-          "name": "App Server",
-          "instanceId": "i-0xxxxxxxxxxxxxxxxx",
-          "description": "Servidor principal de aplicacion",
-          "dashboardPort": 5476,
-          "group": "sanidad-core"
-        },
-        {
-          "id": "san-db-server",
-          "name": "DB Server",
-          "instanceId": "i-0yyyyyyyyyyyyyyyyy",
-          "description": "Servidor de base de datos",
-          "dashboardPort": null,
-          "group": "sanidad-core"
-        }
-      ],
-      "groups": [
-        {
-          "id": "sanidad-core",
-          "name": "Core Sanidad",
-          "description": "Infraestructura principal Sanidad (se encienden/apagan juntas)",
-          "startOrder": ["san-db-server", "san-app-server"],
-          "stopOrder": ["san-app-server", "san-db-server"]
-        }
-      ]
-    },
-    {
-      "id": "nuvu-10",
-      "name": "NUV - PROD - Nuvu Account 10",
-      "awsAccountId": "222222222222",
-      "region": "us-east-1",
-      "crossAccountRoleArn": "arn:aws:iam::222222222222:role/CloudControlRemoteAccess",
-      "instances": [
-        {
-          "id": "nuvu-main",
-          "name": "Main Server",
-          "instanceId": "i-0zzzzzzzzzzzzzzzzz",
-          "description": "Servidor principal Nuvu",
+          "id": "kirocrew-main",
+          "name": "KiroCrew Server",
+          "instanceId": "i-08938f8f00b932edc",
+          "description": "Instancia principal KiroCrew",
           "dashboardPort": 5476,
           "group": null
         }
