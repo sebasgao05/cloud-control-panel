@@ -1,5 +1,5 @@
 {
-  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias.",
+  "_comment": "Cloud Control Panel - Configuracion mono-cuenta (una sola cuenta AWS).",
 
   "settings": {
     "defaultRegion": "us-east-1",
@@ -8,27 +8,48 @@
   },
 
   "apiKeys": {
-    "CHANGE_ME_admin_key": {
-      "name": "Admin Principal",
-      "role": "admin",
+    "CHANGE_ME_superadmin_key": {
+      "name": "Super Admin",
+      "role": "superadmin",
       "accounts": ["*"]
+    },
+    "CHANGE_ME_operator_key": {
+      "name": "Operador",
+      "role": "operator",
+      "accounts": ["principal"],
+      "scheduler": {
+        "view": true,
+        "edit": false
+      }
     }
   },
 
   "accounts": [
     {
       "id": "principal",
-      "name": "SGB - Admin",
+      "name": "Mi Cuenta AWS",
       "awsAccountId": "111111111111",
       "region": "us-east-1",
       "crossAccountRoleArn": null,
+      "features": {
+        "scheduler": true,
+        "notifications": true,
+        "costEstimate": true
+      },
+      "schedule": {
+        "timezone": "America/Bogota",
+        "rules": []
+      },
+      "notifications": {
+        "channels": []
+      },
       "instances": [
         {
-          "id": "SBG-main",
-          "name": "SBG Server",
+          "id": "mi-server",
+          "name": "Mi Servidor",
           "instanceId": "i-0xxxxxxxxxxxxxxxxx",
-          "description": "Servidor principal de aplicacion",
-          "dashboardPort": 5476,
+          "description": "Servidor principal",
+          "dashboardPort": null,
           "group": null
         }
       ],

@@ -1,5 +1,5 @@
 {
-  "_comment": "Cloud Control Panel - Configuracion de cuentas e instancias. Editado solo por admin.",
+  "_comment": "Cloud Control Panel - Configuracion multi-cuenta con todas las features.",
 
   "settings": {
     "defaultRegion": "us-east-1",
@@ -8,15 +8,20 @@
   },
 
   "apiKeys": {
+    "CHANGE_ME_superadmin_key": {
+      "name": "Super Admin",
+      "role": "superadmin",
+      "accounts": ["*"]
+    },
     "CHANGE_ME_admin_key": {
-      "name": "Admin Principal",
+      "name": "Admin Equipo",
       "role": "admin",
       "accounts": ["*"]
     },
     "CHANGE_ME_operator_key": {
-      "name": "Operador paridad",
+      "name": "Operador",
       "role": "operator",
-      "accounts": ["paridad"],
+      "accounts": ["cuenta-1"],
       "scheduler": {
         "view": true,
         "edit": false
@@ -26,8 +31,8 @@
 
   "accounts": [
     {
-      "id": "paridad",
-      "name": "TEST - paridad",
+      "id": "cuenta-1",
+      "name": "PROD - Mi Proyecto",
       "awsAccountId": "111111111111",
       "region": "us-east-1",
       "crossAccountRoleArn": "arn:aws:iam::111111111111:role/CloudControlRemoteAccess",
@@ -35,6 +40,19 @@
         "scheduler": true,
         "notifications": true,
         "costEstimate": true
+      },
+      "schedule": {
+        "timezone": "America/Bogota",
+        "rules": [
+          {
+            "id": "rule-1",
+            "instances": ["app-server", "db-server"],
+            "startCron": "0 7 * * 1-5",
+            "stopCron": "0 20 * * 1-5",
+            "description": "L-V 7am a 8pm",
+            "enabled": true
+          }
+        ]
       },
       "notifications": {
         "channels": [
@@ -46,60 +64,75 @@
               "to": "admin@empresa.com",
               "smtpHost": "smtp.gmail.com",
               "smtpPort": 587,
-              "smtpUser": "alerts@empresa.com"
+              "smtpUser": "alerts@empresa.com",
+              "smtpPass": "CHANGE_ME_app_password"
             },
-            "events": ["started", "stopped", "error"],
+            "events": ["started", "stopped", "error", "scheduler_executed"],
             "enabled": true
-          }
-        ]
-      },
-      "schedule": {
-        "timezone": "America/Bogota",
-        "rules": [
+          },
           {
-            "id": "rule-1",
-            "instances": ["par-app-server", "par-db-server"],
-            "startCron": "0 7 * * 1-5",
-            "stopCron": "0 20 * * 1-5",
-            "description": "L-V 7am a 8pm",
-            "enabled": true
+            "id": "ch-2",
+            "type": "telegram",
+            "name": "Bot DevOps",
+            "config": {
+              "botToken": "CHANGE_ME_bot_token",
+              "chatId": "CHANGE_ME_chat_id"
+            },
+            "events": ["started", "stopped", "scheduler_executed"],
+            "enabled": false
+          },
+          {
+            "id": "ch-3",
+            "type": "teams",
+            "name": "Canal Infra",
+            "config": {
+              "webhookUrl": "CHANGE_ME_webhook_url"
+            },
+            "events": ["error"],
+            "enabled": false
           }
         ]
       },
       "instances": [
         {
-          "id": "par-app-server",
+          "id": "app-server",
           "name": "App Server",
           "instanceId": "i-0xxxxxxxxxxxxxxxxx",
-          "instanceType": "t3.medium",
           "description": "Servidor principal de aplicacion",
           "dashboardPort": 5476,
-          "group": "paridad-core"
+          "group": "core"
         },
         {
-          "id": "par-db-server",
-          "name": "DB Server",
+          "id": "db-server",
+          "name": "Database Server",
           "instanceId": "i-0yyyyyyyyyyyyyyyyy",
-          "instanceType": "r5.large",
-          "description": "Servidor de base de datos",
+          "description": "PostgreSQL",
           "dashboardPort": null,
-          "group": "paridad-core"
+          "group": "core"
+        },
+        {
+          "id": "worker",
+          "name": "Worker",
+          "instanceId": "i-0zzzzzzzzzzzzzzzzz",
+          "description": "Background jobs",
+          "dashboardPort": null,
+          "group": null
         }
       ],
       "groups": [
         {
-          "id": "paridad-core",
-          "name": "Core paridad",
-          "description": "Infraestructura principal paridad (se encienden/apagan juntas)",
+          "id": "core",
+          "name": "Core Servers",
+          "description": "App + DB - se encienden/apagan juntas",
           "color": "#6366f1",
-          "startOrder": ["par-db-server", "par-app-server"],
-          "stopOrder": ["par-app-server", "par-db-server"]
+          "startOrder": ["db-server", "app-server"],
+          "stopOrder": ["app-server", "db-server"]
         }
       ]
     },
     {
-      "id": "SBG-10",
-      "name": "PROD - SBG 10",
+      "id": "cuenta-2",
+      "name": "DEV - Staging",
       "awsAccountId": "222222222222",
       "region": "us-east-1",
       "crossAccountRoleArn": "arn:aws:iam::222222222222:role/CloudControlRemoteAccess",
@@ -110,11 +143,10 @@
       },
       "instances": [
         {
-          "id": "SBG-main",
-          "name": "Main Server",
-          "instanceId": "i-0zzzzzzzzzzzzzzzzz",
-          "instanceType": "t3.large",
-          "description": "Servidor principal SBG",
+          "id": "staging",
+          "name": "Staging Server",
+          "instanceId": "i-0aaaaaaaaaaaaaaaaa",
+          "description": "Entorno de pruebas",
           "dashboardPort": 5476,
           "group": null
         }
