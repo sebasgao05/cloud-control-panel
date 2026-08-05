@@ -104,3 +104,7 @@ La Lambda usara sus permisos directos sin asumir otro rol.
   en `crossAccountRoleArn` coincida con el rol creado.
 - Para Permission Sets de SSO (PS-SupportEngineerAccess, etc.), estos son para
   acceso humano al portal. La Lambda usa roles IAM clasicos, no SSO.
+- El deploy inicial migra el JSON a DynamoDB automaticamente. Despues de eso,
+  puedes agregar cuentas remotas desde el panel (solo superadmin) sin re-deploy.
+- EventBridge Scheduler tambien necesita los permisos cross-account si las instancias
+  programadas estan en cuentas remotas.

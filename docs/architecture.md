@@ -2,21 +2,22 @@
 
 ## Vision General
 
-Cloud Control Panel es un panel de control serverless para gestionar instancias EC2
-en una o multiples cuentas AWS. Permite encender, apagar, actualizar y monitorear
-instancias de forma centralizada.
+Cloud Control Panel es un panel serverless para gestionar instancias EC2 en multiples cuentas AWS.
+Permite encender, apagar, programar, monitorear costos y recibir notificaciones.
 
 ## Stack Tecnologico
 
 | Capa | Tecnologia | Justificacion |
 |------|-----------|---------------|
-| Frontend | HTML + CSS + JS (Vanilla) | Sin build step, deploy directo a S3, <20KB total |
-| Backend | Python 3.13 (Lambda) | Cold start rapido, sin frameworks, AWS SDK nativo |
-| API | API Gateway HTTP API v2 | Bajo costo, baja latencia, routing simple |
+| Frontend | HTML + CSS + JS (Vanilla) | Sin build step, deploy directo a S3, <25KB |
+| Backend | Python 3.13 (Lambda) | Cold start rapido, AWS SDK nativo |
+| API | API Gateway HTTP API v2 | Bajo costo, baja latencia |
 | CDN | CloudFront | HTTPS, cache, routing frontend/API |
 | Storage | S3 | Hosting estatico del frontend |
-| IaC | CloudFormation (SAM) | Infraestructura como codigo, deploy reproducible |
-| Auth | API Key en config | Simple, sin Cognito, sin base de datos |
+| Config DB | DynamoDB | Config dinamico, activity log, sin servidor |
+| Scheduler | EventBridge Scheduler | Cron automatico sin costo adicional |
+| IaC | CloudFormation | Infraestructura como codigo |
+| Auth | API Key + DynamoDB | Roles: superadmin, admin, operator |
 
 ## Diagrama de Flujo
 
@@ -28,118 +29,93 @@ instancias de forma centralizada.
        | HTTPS
        v
 +--------------+
-|  CloudFront  |-------- Cache + HTTPS + Routing
+|  CloudFront  |--- Cache + HTTPS + Routing
 +------+-------+
        |
-       +-- /index.html, /app.js, /style.css
+       +-- /* (frontend)
        |        |
        |        v
        |   +---------+
-       |   |   S3    | Frontend estatico
+       |   |   S3    | HTML + JS + CSS
        |   +---------+
        |
-       +-- /api/*
+       +-- /api/* (backend)
                 |
                 v
        +----------------+
        |  API Gateway   | HTTP API v2
-       |  (HTTP API)    |
        +-------+--------+
                |
                v
        +----------------+
-       |    Lambda      | Python 3.13
-       |  (app.py)      |
+       |    Lambda      | Python 3.13 (app.py)
        +-------+--------+
                |
-               +-- Auth: Valida X-Api-Key contra accounts.json
+               +-- DynamoDB (config, keys, activity log)
                |
-               +-- Cuenta local (sin crossAccountRoleArn)
-               |        |
-               |        v
-               |   +---------+
-               |   |   EC2   | DescribeInstances, Start, Stop
-               |   |   SSM   | SendCommand (update)
-               |   +---------+
+               +-- EC2 (start/stop/describe)
                |
-               +-- Cuenta remota (con crossAccountRoleArn)
-                        |
-                        v
-                   +---------+
-                   |   STS   | AssumeRole
-                   +----+----+
-                        |
-                        v
-                   +---------+
-                   |   EC2   | En cuenta remota
-                   |   SSM   |
-                   +---------+
+               +-- SSM (update via RunCommand)
+               |
+               +-- STS (AssumeRole para cross-account)
+               |
+               +-- EventBridge Scheduler (crear/eliminar schedules)
+               |
+               +-- SMTP / Telegram API / Teams Webhook (notificaciones)
 ```
+
+## Modelo de Datos (DynamoDB - Single Table)
+
+| PK | SK | Contenido |
+|----|-----|-----------|
+| `CONFIG` | `SETTINGS` | Region, timezone, poll interval |
+| `CONFIG` | `APIKEY#{uuid}` | name, role, accounts[], scheduler{} |
+| `CONFIG` | `ACCOUNT#{id}` | name, awsAccountId, region, features{} |
+| `ACCOUNT#{id}` | `INSTANCE#{id}` | name, instanceId, description, port, group |
+| `ACCOUNT#{id}` | `GROUP#{id}` | name, color, startOrder[], stopOrder[] |
+| `ACCOUNT#{id}` | `SCHEDULE#{id}` | startCron, stopCron, instances[], enabled |
+| `ACCOUNT#{id}` | `CHANNEL#{id}` | type, name, config{}, events[], enabled |
+| `ACTIVITY#{id}` | `{timestamp}` | action, user, instanceIds[] |
 
 ## Flujo de Autenticacion
 
 ```
 1. Usuario ingresa API Key en el frontend
-2. Frontend envia X-Api-Key en cada request
-3. Lambda recibe request, lee accounts.json
-4. Busca la key en apiKeys
-5. Si existe -> retorna datos filtrados por permisos
-6. Si no existe -> 401 Unauthorized
+2. Frontend envia X-Api-Key header en cada request
+3. Lambda lee keys de DynamoDB
+4. Si key existe -> filtra datos segun rol y cuentas asignadas
+5. Si no existe -> 401 Unauthorized
 ```
 
-## Flujo de Operacion (Encender instancia)
+## Flujo del Scheduler
 
 ```
-1. Usuario hace click en "Encender"
-2. Frontend: POST /api/accounts/{id}/instances/{id}/start
-3. Lambda:
-   a. Valida API Key
-   b. Busca cuenta en config
-   c. Si crossAccountRoleArn -> STS AssumeRole
-   d. Llama ec2.start_instances()
-   e. Retorna 200 OK
-4. Frontend: Muestra toast + refresca status en 3s
+1. Superadmin crea regla en el panel (dias + horas + instancias)
+2. Lambda genera cron expression y crea EventBridge Schedule
+3. EventBridge invoca Lambda a la hora programada
+4. Lambda ejecuta start/stop en las instancias
+5. Se registra en activity log + se envia notificacion
 ```
 
-## Estructura de Archivos
+## Flujo de Notificaciones
 
 ```
-cloud-control-panel/
-|-- config/
-|   +-- accounts.json        <- Configuracion central (admin edita aqui)
-|-- backend/
-|   |-- app.py               <- Lambda handler
-|   +-- requirements.txt     <- Dependencias Python (solo boto3 en Lambda)
-|-- frontend/
-|   |-- index.html           <- SPA principal
-|   |-- app.js               <- Logica del frontend
-|   +-- style.css            <- Estilos
-|-- docs/
-|   |-- architecture.md      <- Este documento
-|   |-- admin-guide.md       <- Guia para administradores
-|   |-- user-guide.md        <- Guia para usuarios
-|   |-- configuration.md     <- Referencia de configuracion
-|   +-- cross-account-setup.md <- Setup multi-cuenta
-|-- mock/
-|   +-- server.py            <- Servidor mock para desarrollo local
-|-- template.yaml            <- CloudFormation template
-|-- deploy.ps1               <- Script de despliegue
-+-- samconfig.toml           <- Configuracion SAM
+1. Se ejecuta una accion (manual o scheduler)
+2. Lambda lee canales configurados de la cuenta
+3. Para cada canal habilitado que matchee el evento:
+   - Email: SMTP directo (smtplib)
+   - Telegram: HTTP POST a api.telegram.org
+   - Teams: HTTP POST a webhook URL
+4. Mensaje incluye: recurso, cuenta, quien lo hizo, rol, fecha
 ```
 
 ## Seguridad
 
-- API Keys: Definidas en config, no en DB ni en UI
-- Permisos por cuenta: Cada key solo ve las cuentas asignadas
-- Cross-account: Roles IAM con minimo privilegio
-- HTTPS: Forzado via CloudFront
-- Sin datos persistentes: No hay DB, todo es stateless
-- S3 privado: Solo accesible via CloudFront OAC
-
-## Escalabilidad
-
-- Agregar cuenta: Editar JSON + re-deploy (~3 min)
-- Agregar instancia: Editar JSON + re-deploy
-- Agregar usuario: Agregar key al JSON + re-deploy
-- Cold start Lambda: ~200ms (sin framework)
-- Limite instancias: Sin limite tecnico, limitado por describe_instances batch (max 1000)
+- API Keys almacenadas en DynamoDB (no en codigo)
+- Permisos por rol (superadmin > admin > operator)
+- Proteccion contra escalacion de privilegios
+- Proteccion contra auto-eliminacion
+- Cross-account con IAM roles de minimo privilegio
+- HTTPS forzado via CloudFront
+- S3 privado con OAC
+- No se puede crear superadmin desde el panel
