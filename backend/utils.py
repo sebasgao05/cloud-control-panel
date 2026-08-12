@@ -1,13 +1,15 @@
 """
 Cloud Control Panel - Shared utilities.
-DynamoDB helpers, response helper, decimal conversion, constants.
+DynamoDB helpers, response helper, decimal conversion, constants, migration.
 """
 
 import json
 import logging
 import os
+import uuid
 from decimal import Decimal
 
+import bcrypt
 import boto3
 from boto3.dynamodb.conditions import Key
 
@@ -151,15 +153,91 @@ def migrate_json_to_db(json_config):
     logger.info("[MIGRATE] JSON config migrated to DynamoDB successfully")
 
 
+def is_keys_migrated():
+    """Check if API keys have been migrated to bcrypt hashes."""
+    item = db_get("CONFIG", "KEYS_MIGRATED")
+    return item is not None
+
+
+def migrate_plaintext_keys_to_bcrypt():
+    """
+    Migrate plaintext API keys to bcrypt hashes (one-time operation).
+
+    Before migration: PK=CONFIG, SK=APIKEY#{plaintext_key}, data={name, role, accounts[], ...}
+    After migration:  PK=CONFIG, SK=APIKEY#{uuid}, data={hash: bcrypt_hash, name, role, accounts[], ...}
+
+    Sets a CONFIG/KEYS_MIGRATED flag to prevent re-running.
+    """
+    if is_keys_migrated():
+        return
+
+    logger.info("[MIGRATE] Starting plaintext keys to bcrypt migration...")
+
+    key_items = db_query("CONFIG", "APIKEY#")
+    migrated_count = 0
+
+    for item in key_items:
+        old_sk = item["SK"]
+        plaintext_key = old_sk.replace("APIKEY#", "")
+        data = item.get("data", {})
+
+        # Skip if already migrated (has a hash field)
+        if data.get("hash"):
+            continue
+
+        # Generate bcrypt hash of the plaintext key
+        key_hash = bcrypt.hashpw(plaintext_key.encode("utf-8"), bcrypt.gensalt())
+
+        # Generate a new UUID as the key identifier
+        new_key_id = str(uuid.uuid4())
+
+        # Build new data with hash
+        new_data = {**data, "hash": key_hash.decode("utf-8")}
+
+        # Write new item with UUID-based SK
+        db_put({"PK": "CONFIG", "SK": f"APIKEY#{new_key_id}", "data": new_data})
+
+        # Delete old plaintext-keyed item
+        db_delete("CONFIG", old_sk)
+
+        migrated_count += 1
+        logger.info(f"[MIGRATE] Migrated key to id={new_key_id}")
+
+    # Set migration flag
+    db_put({"PK": "CONFIG", "SK": "KEYS_MIGRATED", "data": {"migrated": True, "count": migrated_count}})
+    logger.info(f"[MIGRATE] Completed bcrypt migration. {migrated_count} keys migrated.")
+
+
+def sanitize_error(status_code):
+    """Return a generic error message for the given HTTP status code.
+
+    Never expose internal error details to clients.
+    """
+    messages = {
+        400: "Bad request",
+        401: "Unauthorized",
+        403: "Forbidden",
+        404: "Not found",
+        405: "Method not allowed",
+        409: "Conflict",
+        429: "Too many requests",
+        500: "Internal server error",
+        502: "Bad gateway",
+        503: "Service unavailable",
+    }
+    return messages.get(status_code, "Internal server error")
+
+
 def response(status_code, body):
-    """Standard API response helper."""
+    """Standard API response helper.
+
+    CORS is handled at the API Gateway level (template.yaml CorsConfiguration).
+    Only Content-Type header is set here.
+    """
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
         },
         "body": json.dumps(body, default=str),
     }

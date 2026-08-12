@@ -3,7 +3,10 @@ Cloud Control Panel - Admin CRUD handlers.
 Account, instance, group, API key management, and cost estimation.
 """
 
+import uuid
 from datetime import datetime, timezone
+
+import bcrypt
 
 from ec2_ops import get_ec2_client
 from utils import EC2_PRICING, db_delete, db_get, db_put, db_query, load_config_from_db, logger, response
@@ -60,33 +63,59 @@ def handle_delete_group(account_id, group_id):
 
 
 def handle_list_keys(config):
-    """List all API keys."""
+    """List all API keys.
+
+    Returns key metadata (name, role, accounts) but never the hash or plaintext.
+    Includes a masked key_id for display (first 8 chars of the UUID).
+    """
     keys = []
     for key_id, data in config.get("apiKeys", {}).items():
-        keys.append({"key": key_id, **data})
+        # Never expose hash or original key value
+        key_info = {
+            "key_id": key_id,
+            "key_preview": key_id[:8] + "...",
+            "name": data.get("name", ""),
+            "role": data.get("role", "operator"),
+            "accounts": data.get("accounts", []),
+        }
+        if "scheduler" in data:
+            key_info["scheduler"] = data["scheduler"]
+        keys.append(key_info)
     return response(200, {"keys": keys})
 
 
 def handle_create_key(body):
-    """Create or update an API key."""
-    key_id = body.get("key")
-    if not key_id:
-        import uuid
-        key_id = str(uuid.uuid4())
+    """Create a new API key with bcrypt hashing.
+
+    Generates a random key value (UUID4), hashes it with bcrypt,
+    and stores the hash. Returns the plaintext key ONCE in the response
+    (it will never be retrievable again).
+    """
+    # Generate a new random API key and a separate key_id
+    plaintext_key = str(uuid.uuid4())
+    key_id = str(uuid.uuid4())
+
+    # Hash the plaintext key with bcrypt
+    key_hash = bcrypt.hashpw(plaintext_key.encode("utf-8"), bcrypt.gensalt())
+
     data = {k: v for k, v in body.items() if k != "key"}
     data.setdefault("role", "operator")
     data.setdefault("accounts", [])
+    data["hash"] = key_hash.decode("utf-8")
+
     db_put({"PK": "CONFIG", "SK": f"APIKEY#{key_id}", "data": data})
-    return response(200, {"message": "Key created", "key": key_id})
+    return response(200, {
+        "message": "Key created",
+        "key": plaintext_key,
+        "key_id": key_id,
+        "note": "Save this key now. It cannot be retrieved again.",
+    })
 
 
 def handle_create_key_validated(body, user_info):
     """Create an API key with role-based validation."""
     target_role = body.get("role", "operator")
     if user_info.get("role") == "admin":
-        existing = db_get("CONFIG", f"APIKEY#{body.get('key', '')}")
-        if existing and existing.get("data", {}).get("role", "operator") != "operator":
-            return response(403, {"error": "Un admin solo puede editar operadores"})
         if target_role != "operator":
             return response(403, {"error": "Un admin solo puede asignar rol de operador"})
     elif user_info.get("role") == "superadmin" and target_role == "superadmin":
@@ -95,18 +124,51 @@ def handle_create_key_validated(body, user_info):
 
 
 def handle_delete_key(key_id, event):
-    """Delete an API key with role-based restrictions."""
+    """Delete an API key by key_id with role-based restrictions.
+
+    Keys are identified by their UUID key_id (the SK suffix).
+    The caller's identity is validated via bcrypt in authenticate().
+    """
     headers = event.get("headers", {})
     current_key = headers.get("x-api-key", "")
 
-    if key_id == current_key:
+    # Load config to determine caller and target info
+    config = load_config_from_db()
+
+    # Find caller info by checking which key matches via bcrypt
+    caller_info = None
+    caller_key_id = None
+    for kid, kdata in config.get("apiKeys", {}).items():
+        stored_hash = kdata.get("hash")
+        if stored_hash:
+            try:
+                hash_bytes = stored_hash.encode("utf-8") if isinstance(stored_hash, str) else stored_hash
+                if bcrypt.checkpw(current_key.encode("utf-8"), hash_bytes):
+                    caller_info = kdata
+                    caller_key_id = kid
+                    break
+            except (ValueError, TypeError):
+                continue
+        elif kid == current_key:
+            # Legacy plaintext fallback
+            caller_info = kdata
+            caller_key_id = kid
+            break
+
+    if not caller_info:
+        return response(401, {"error": "Unauthorized"})
+
+    # Prevent self-deletion
+    if key_id == caller_key_id:
         return response(400, {"error": "No puedes eliminar tu propia API Key."})
 
-    config = load_config_from_db()
-    caller_info = config.get("apiKeys", {}).get(current_key, {})
     caller_role = caller_info.get("role", "operator")
 
-    target_info = config.get("apiKeys", {}).get(key_id, {})
+    # Find target key info
+    target_item = db_get("CONFIG", f"APIKEY#{key_id}")
+    if not target_item:
+        return response(404, {"error": "Key no encontrada"})
+    target_info = target_item.get("data", {})
     target_role = target_info.get("role", "operator")
 
     if caller_role == "operator":

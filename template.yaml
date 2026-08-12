@@ -148,7 +148,8 @@ Resources:
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins:
-          - "*"
+          - !Sub "https://${Distribution.DomainName}"
+          - "http://localhost:8080"
         AllowMethods:
           - GET
           - POST
@@ -180,6 +181,9 @@ Resources:
       ApiId: !Ref ControlApi
       StageName: prod
       AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 200
+        ThrottlingRateLimit: 100
 
   ControlFunctionInvokePermission:
     Type: AWS::Lambda::Permission

@@ -12,7 +12,8 @@ from ec2_ops import (handle_dashboard_url, handle_group_start, handle_group_stat
 from notifications import handle_get_notifications, handle_test_notification, handle_update_notifications
 from scheduler import (handle_clear_activity, handle_get_activity, handle_get_schedule,
     handle_scheduler_event, handle_update_schedule)
-from utils import CONFIG_PATH, is_db_initialized, load_config_from_db, logger, migrate_json_to_db, response
+from utils import (CONFIG_PATH, is_db_initialized, load_config_from_db, logger,
+    migrate_json_to_db, migrate_plaintext_keys_to_bcrypt, response)
 
 
 def lambda_handler(event, context):
@@ -33,6 +34,10 @@ def lambda_handler(event, context):
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 migrate_json_to_db(json.load(f))
             logger.info("[INIT] Auto-migrated JSON config to DynamoDB")
+
+    # Run bcrypt key migration if not already done
+    migrate_plaintext_keys_to_bcrypt()
+
     config = load_config_from_db()
     parts = path.strip("/").split("/")
     if method == "POST" and parts == ["api", "migrate"]:
@@ -156,4 +161,4 @@ def lambda_handler(event, context):
         return response(404, {"error": "Not found"})
     except Exception as e:
         logger.error(f"[ERROR] {e!s}", exc_info=True)
-        return response(500, {"error": str(e)})
+        return response(500, {"error": "Internal server error"})
