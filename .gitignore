@@ -24,3 +24,19 @@ config/accountsMono.json
 
 # Bundled config in backend (generated during deploy)
 backend/accounts.json
+
+# Pip dependencies installed temporarily during deploy (should be cleaned up by deploy script)
+backend/*.dist-info/
+backend/bin/
+backend/pydantic/
+backend/pydantic_core/
+backend/bcrypt/
+backend/boto3/
+backend/botocore/
+backend/s3transfer/
+backend/jmespath/
+backend/urllib3/
+backend/dateutil/
+backend/six.py
+backend/typing_extensions.py
+backend/annotated_types/

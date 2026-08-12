@@ -7,6 +7,8 @@ on:
     branches: [main]
 
 jobs:
+  # ─── Lint & Test ─────────────────────────────────────────────────────
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -49,14 +51,136 @@ jobs:
       - name: Run tests with coverage
         run: pytest tests/ -v --cov=backend --cov-report=term-missing
 
+  # ─── Staging: deploy efímero en PRs para validar infraestructura ─────
+
+  staging-deploy:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy staging stack
+        id: deploy
+        run: |
+          STACK_TAG="ccp-staging-pr${{ github.event.pull_request.number }}"
+          STACK_NAME="cloud-control-${STACK_TAG}"
+          echo "stack-name=${STACK_NAME}" >> "$GITHUB_OUTPUT"
+          echo "stack-tag=${STACK_TAG}" >> "$GITHUB_OUTPUT"
+
+          # Create config for staging (uses example config)
+          cp config/accounts.example.json config/accounts.json
+
+          # Deploy
+          chmod +x deploy.sh
+          ./deploy.sh --stack-tag "${STACK_TAG}" --env staging
+
+          # Get panel URL
+          PANEL_URL=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --query "Stacks[0].Outputs[?OutputKey=='ControlPanelUrl'].OutputValue" \
+            --output text)
+          echo "panel-url=${PANEL_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Comment PR with staging URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.panel-url }}';
+            const stack = '${{ steps.deploy.outputs.stack-name }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🚀 Staging deployed\n\n**URL:** ${url}\n**Stack:** \`${stack}\`\n\n### Pruebas requeridas\nValida el ambiente y luego aprueba el environment **"staging-approve"** para destruirlo y habilitar merge a producción.\n\n**API Keys de prueba** (accounts.example.json):\n| Key | Rol |\n|-----|-----|\n| \`CHANGE_ME_superadmin_key\` | Superadmin |\n| \`CHANGE_ME_admin_key\` | Admin |\n| \`CHANGE_ME_operator_key\` | Operador |`
+            });
+
+  # ─── Gate: requiere aprobación manual después de probar staging ──────
+
+  staging-approve:
+    name: Approve Staging
+    runs-on: ubuntu-latest
+    needs: staging-deploy
+    if: github.event_name == 'pull_request'
+    environment: staging-approve
+    steps:
+      - name: Staging approved
+        run: echo "✅ Staging probado y aprobado. Procediendo a destruir el ambiente."
+
+  # ─── Destroy staging después de aprobación ───────────────────────────
+
+  staging-destroy:
+    name: Destroy Staging
+    runs-on: ubuntu-latest
+    needs: staging-approve
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Destroy staging stack
+        run: |
+          STACK_TAG="ccp-staging-pr${{ github.event.pull_request.number }}"
+          STACK_NAME="cloud-control-${STACK_TAG}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          BUCKET_NAME="cloud-control-${STACK_TAG}-${ACCOUNT_ID}"
+
+          echo "🗑️ Destroying staging: ${STACK_NAME}"
+
+          # Empty S3 bucket (required before stack deletion)
+          aws s3 rm "s3://${BUCKET_NAME}" --recursive 2>/dev/null || true
+
+          # Delete CloudFormation stack
+          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+          echo "Waiting for stack deletion..."
+          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}" || true
+
+          echo "✅ Staging destroyed."
+
+      - name: Comment PR - staging destroyed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.pull_request.number }},
+              body: `## 🗑️ Staging destroyed\n\nEl ambiente de staging fue eliminado después de la aprobación.\n\n✅ El PR está listo para merge a producción.`
+            });
+
+  # ─── Production: deploy solo en push a main ──────────────────────────
+
   deploy:
-    name: Deploy
+    name: Deploy Production
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -68,4 +192,4 @@ jobs:
       - name: Deploy to production
         run: |
           chmod +x deploy.sh
-          ./deploy.sh --env prod
+          ./deploy.sh --stack-tag ccp-main --env prod

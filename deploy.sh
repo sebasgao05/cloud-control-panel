@@ -61,9 +61,12 @@ if ! aws s3api head-bucket --bucket "${S3_BUCKET}" 2>/dev/null; then
 fi
 echo "  OK"
 
-# Step 2: Copy accounts.json to backend (bundled with Lambda)
-echo "[2/6] Bundling config with Lambda..."
+# Step 2: Install dependencies + copy config
+echo "[2/6] Bundling config and dependencies with Lambda..."
 cp config/accounts.json backend/accounts.json
+pip install -r backend/requirements.txt -t backend/ --upgrade --quiet \
+    --platform manylinux2014_aarch64 --implementation cp \
+    --python-version 3.13 --only-binary=:all: 2>/dev/null
 echo "  OK"
 
 # Step 3: Package CloudFormation
@@ -116,8 +119,22 @@ aws s3 sync frontend/ "s3://${BUCKET_NAME}/" --delete --region "${REGION}" > /de
 aws cloudfront create-invalidation --distribution-id "${DISTRIBUTION_ID}" --paths "/*" > /dev/null
 echo "  OK"
 
-# Cleanup bundled config
+# Cleanup bundled config and installed dependencies
 rm -f backend/accounts.json
+# Keep only project source files
+find backend/ -maxdepth 1 \
+    -not -name "backend" \
+    -not -name "admin.py" \
+    -not -name "app.py" \
+    -not -name "auth.py" \
+    -not -name "ec2_ops.py" \
+    -not -name "notifications.py" \
+    -not -name "scheduler.py" \
+    -not -name "utils.py" \
+    -not -name "validators.py" \
+    -not -name "requirements.txt" \
+    -not -name "ruff.toml" \
+    -exec rm -rf {} + 2>/dev/null || true
 
 echo ""
 echo "========================================"

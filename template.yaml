@@ -148,8 +148,7 @@ Resources:
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins:
-          - !Sub "https://${Distribution.DomainName}"
-          - "http://localhost:8080"
+          - "*"
         AllowMethods:
           - GET
           - POST
