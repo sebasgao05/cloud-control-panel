@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "refactor",
+  "description": "Modularize backend/app.py (~1218 lines) into separate Python modules within backend/ directory. Split into: auth.py (authentication, API key validation), ec2_ops.py (EC2/SSM operations, instance start/stop/status), scheduler.py (EventBridge scheduler CRUD + event handling), notifications.py (email/telegram/teams sending), admin.py (CRUD for accounts/instances/groups/keys), utils.py (DynamoDB helpers, response helper, decimal conversion), and a slim app.py that only contains lambda_handler as router importing from the modules. Also add pydantic to requirements.txt for input validation (used in next feature), and bcrypt for security feature.",
+  "status": "in_progress",
+  "steps": [
+    "Create backend/utils.py: Move db_get, db_put, db_delete, db_query, get_table, decimal_to_native, load_config_from_db, is_db_initialized, migrate_json_to_db, response() helper, EC2_PRICING dict, CONFIG_TABLE/REGION constants, logger setup. This is the shared foundation.",
+    "Create backend/auth.py: Move authenticate(), get_allowed_accounts(), get_scheduler_permissions(), is_admin(), is_superadmin(), find_instance(), find_group() helper functions.",
+    "Create backend/ec2_ops.py: Move get_ec2_client(), get_ssm_client(), handle_list_instances(), handle_instance_status(), handle_instance_start(), handle_instance_stop(), handle_instance_update(), handle_dashboard_url(), handle_group_status(), handle_group_start(), handle_group_stop(), handle_list_accounts(). Import auth helpers and utils as needed.",
+    "Create backend/scheduler.py: Move handle_get_schedule(), handle_update_schedule(), handle_scheduler_event(), create_eventbridge_schedule(), delete_eventbridge_schedule(), cron_to_eventbridge(), log_activity(), handle_get_activity(), handle_clear_activity().",
+    "Create backend/notifications.py: Move handle_get_notifications(), handle_update_notifications(), handle_test_notification(), send_notifications(), send_single_notification(), send_email(), send_telegram(), send_teams().",
+    "Create backend/admin.py: Move handle_create_account(), handle_delete_account(), handle_create_instance(), handle_delete_instance(), handle_create_group(), handle_delete_group(), handle_list_keys(), handle_create_key(), handle_delete_key(), handle_update_key_accounts(), handle_get_costs().",
+    "Rewrite backend/app.py as a slim router: Keep lambda_handler function (the entry point referenced in template.yaml Handler: app.lambda_handler), import all handlers from the modules, keep the routing logic but delegate to imported handlers. Remove all moved function bodies.",
+    "Update backend/requirements.txt: Add pydantic>=2.0, bcrypt>=4.0 (needed for subsequent features). Keep boto3.",
+    "Verify all imports are correct by running: python -c 'import sys; sys.path.insert(0, \"backend\"); import app' to confirm the module loads without import errors."
+  ],
+  "acceptance_criteria": [
+    "backend/app.py contains only lambda_handler (router) + imports, under 150 lines",
+    "backend/utils.py, auth.py, ec2_ops.py, scheduler.py, notifications.py, admin.py all exist with the moved functions",
+    "Running `python -c \"import sys; sys.path.insert(0, 'backend'); import app\"` succeeds without ImportError",
+    "All handler functions are importable from their respective modules",
+    "requirements.txt includes boto3, pydantic>=2.0, bcrypt>=4.0",
+    "The Lambda handler entry point (app.lambda_handler) still exists and is callable"
+  ],
+  "verification": [
+    "Run `pip install -r backend/requirements.txt` and confirm it installs successfully",
+    "Run `python -c \"import sys; sys.path.insert(0, 'backend'); from app import lambda_handler; print('OK')\"` to confirm the Lambda entry point works",
+    "Run `python -c \"import sys; sys.path.insert(0, 'backend'); from auth import authenticate; from ec2_ops import handle_instance_start; from scheduler import handle_scheduler_event; from notifications import send_notifications; from admin import handle_create_account; from utils import db_get, response; print('All imports OK')\"` to verify all modules",
+    "Run `ruff check backend/` to check for linting issues"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
