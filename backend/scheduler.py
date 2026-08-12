@@ -8,10 +8,12 @@ import os
 from datetime import datetime, timezone
 
 import boto3
+from pydantic import ValidationError
 
 from auth import get_scheduler_permissions
 from notifications import send_notifications
 from utils import REGION, db_delete, db_put, db_query, decimal_to_native, load_config_from_db, logger, response
+from validators import UpdateScheduleRequest, format_validation_errors
 
 
 def log_activity(account_id, action, user_name, instance_ids, rule_id=None):
@@ -62,6 +64,11 @@ def handle_update_schedule(account, account_id, user_info, body):
     permissions = get_scheduler_permissions(user_info)
     if not permissions["edit"]:
         return response(200, {"error": "No tienes permiso", "denied": True})
+
+    try:
+        UpdateScheduleRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
 
     existing = db_query(f"ACCOUNT#{account_id}", "SCHEDULE#")
     old_rule_ids = [item["SK"].replace("SCHEDULE#", "") for item in existing]

@@ -7,16 +7,28 @@ import uuid
 from datetime import datetime, timezone
 
 import bcrypt
+from pydantic import ValidationError
 
 from ec2_ops import get_ec2_client
 from utils import EC2_PRICING, db_delete, db_get, db_put, db_query, load_config_from_db, logger, response
+from validators import (
+    CreateAccountRequest,
+    CreateGroupRequest,
+    CreateInstanceRequest,
+    CreateKeyRequest,
+    UpdateKeyAccountsRequest,
+    format_validation_errors,
+)
 
 
 def handle_create_account(body):
     """Create a new account."""
-    acc_id = body.get("id")
-    if not acc_id:
-        return response(400, {"error": "id is required"})
+    try:
+        validated = CreateAccountRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
+    acc_id = validated.id
     meta = {k: v for k, v in body.items() if k not in ("instances", "groups", "id")}
     meta.setdefault("features", {"scheduler": True, "notifications": True, "costEstimate": True})
     db_put({"PK": "CONFIG", "SK": f"ACCOUNT#{acc_id}", "data": meta})
@@ -34,9 +46,12 @@ def handle_delete_account(account_id):
 
 def handle_create_instance(account_id, body):
     """Create an instance in an account."""
-    inst_id = body.get("id")
-    if not inst_id:
-        return response(400, {"error": "id is required"})
+    try:
+        validated = CreateInstanceRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
+    inst_id = validated.id
     db_put({"PK": f"ACCOUNT#{account_id}", "SK": f"INSTANCE#{inst_id}", "data": body})
     return response(200, {"message": f"Instance {inst_id} created", "id": inst_id})
 
@@ -49,9 +64,12 @@ def handle_delete_instance(account_id, instance_id):
 
 def handle_create_group(account_id, body):
     """Create a group in an account."""
-    grp_id = body.get("id")
-    if not grp_id:
-        return response(400, {"error": "id is required"})
+    try:
+        validated = CreateGroupRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
+    grp_id = validated.id
     db_put({"PK": f"ACCOUNT#{account_id}", "SK": f"GROUP#{grp_id}", "data": body})
     return response(200, {"message": f"Group {grp_id} created", "id": grp_id})
 
@@ -114,7 +132,12 @@ def handle_create_key(body):
 
 def handle_create_key_validated(body, user_info):
     """Create an API key with role-based validation."""
-    target_role = body.get("role", "operator")
+    try:
+        validated = CreateKeyRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
+    target_role = validated.role
     if user_info.get("role") == "admin":
         if target_role != "operator":
             return response(403, {"error": "Un admin solo puede asignar rol de operador"})
@@ -186,12 +209,17 @@ def handle_delete_key(key_id, event):
 
 def handle_update_key_accounts(key_id, body):
     """Update the accounts list for a specific key."""
+    try:
+        validated = UpdateKeyAccountsRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
     item = db_get("CONFIG", f"APIKEY#{key_id}")
     if not item:
         return response(404, {"error": "Key no encontrada"})
 
     data = item.get("data", {})
-    data["accounts"] = body.get("accounts", data.get("accounts", []))
+    data["accounts"] = validated.accounts
     db_put({"PK": "CONFIG", "SK": f"APIKEY#{key_id}", "data": data})
     return response(200, {"message": "Acceso actualizado", "accounts": data["accounts"]})
 

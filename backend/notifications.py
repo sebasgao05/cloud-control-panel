@@ -9,8 +9,11 @@ from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from urllib import request as urllib_request
 
+from pydantic import ValidationError
+
 from auth import is_superadmin
 from utils import db_delete, db_put, db_query, logger, response
+from validators import TestNotificationRequest, UpdateNotificationsRequest, format_validation_errors
 
 
 def handle_get_notifications(account, user_info):
@@ -28,6 +31,12 @@ def handle_update_notifications(account, account_id, user_info, body):
     """Update notification channels for an account."""
     if not is_superadmin(user_info):
         return response(200, {"error": "Solo superadmin", "denied": True})
+
+    try:
+        UpdateNotificationsRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
     existing = db_query(f"ACCOUNT#{account_id}", "CHANNEL#")
     for item in existing:
         db_delete(item["PK"], item["SK"])
@@ -42,7 +51,13 @@ def handle_test_notification(account, user_info, body):
     """Send a test notification to a specific channel."""
     if not is_superadmin(user_info):
         return response(200, {"error": "Solo superadmin", "denied": True})
-    channel_id = body.get("channelId")
+
+    try:
+        validated = TestNotificationRequest.model_validate(body)
+    except ValidationError as e:
+        return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+
+    channel_id = validated.channelId
     channels = account.get("notifications", {}).get("channels", [])
     channel = next((ch for ch in channels if ch["id"] == channel_id), None)
     if not channel:

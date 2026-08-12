@@ -2,6 +2,8 @@
 import json
 import os
 
+from pydantic import ValidationError
+
 from admin import (handle_create_account, handle_create_group, handle_create_instance,
     handle_create_key_validated, handle_delete_account, handle_delete_group,
     handle_delete_instance, handle_delete_key, handle_get_costs, handle_list_keys, handle_update_key_accounts)
@@ -14,6 +16,7 @@ from scheduler import (handle_clear_activity, handle_get_activity, handle_get_sc
     handle_scheduler_event, handle_update_schedule)
 from utils import (CONFIG_PATH, is_db_initialized, load_config_from_db, logger,
     migrate_json_to_db, migrate_plaintext_keys_to_bcrypt, response)
+from validators import ImportConfigRequest, format_validation_errors, validate_path_parameter
 
 
 def lambda_handler(event, context):
@@ -61,7 +64,12 @@ def lambda_handler(event, context):
         if method == "PUT" and parts == ["api", "config"]:
             if not is_superadmin(user_info):
                 return response(403, {"error": "Solo superadmin"})
-            migrate_json_to_db(json.loads(event.get("body", "{}") or "{}"))
+            body = json.loads(event.get("body", "{}") or "{}")
+            try:
+                ImportConfigRequest.model_validate(body)
+            except ValidationError as e:
+                return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+            migrate_json_to_db(body)
             return response(200, {"message": "Config imported successfully"})
         if method == "POST" and parts == ["api", "accounts"]:
             if not is_superadmin(user_info):
@@ -70,9 +78,13 @@ def lambda_handler(event, context):
         if method == "DELETE" and len(parts) == 3 and parts[:2] == ["api", "accounts"]:
             if not is_superadmin(user_info):
                 return response(403, {"error": "Solo superadmin puede eliminar cuentas"})
+            if not validate_path_parameter(parts[2]):
+                return response(400, {"error": "Invalid account_id format"})
             return handle_delete_account(parts[2])
         if len(parts) >= 3 and parts[:2] == ["api", "accounts"]:
             account_id = parts[2]
+            if not validate_path_parameter(account_id):
+                return response(400, {"error": "Invalid account_id format"})
             allowed_accounts = get_allowed_accounts(user_info, config)
             account = next((a for a in allowed_accounts if a["id"] == account_id), None)
             if not account:
@@ -84,6 +96,8 @@ def lambda_handler(event, context):
                     return response(403, {"error": "Solo superadmin puede crear instancias"})
                 return handle_create_instance(account_id, json.loads(event.get("body", "{}") or "{}"))
             if len(parts) >= 5 and parts[3] == "instances":
+                if not validate_path_parameter(parts[4]):
+                    return response(400, {"error": "Invalid instance_id format"})
                 instance = find_instance(account, parts[4])
                 if not instance:
                     return response(404, {"error": "Instance not found"})
@@ -109,6 +123,8 @@ def lambda_handler(event, context):
                         return response(403, {"error": "Solo superadmin puede crear grupos"})
                     return handle_create_group(account_id, json.loads(event.get("body", "{}") or "{}"))
                 if len(parts) >= 5:
+                    if not validate_path_parameter(parts[4]):
+                        return response(400, {"error": "Invalid group_id format"})
                     group = find_group(account, parts[4])
                     if len(parts) == 5 and method == "DELETE":
                         if not is_superadmin(user_info):
@@ -155,8 +171,12 @@ def lambda_handler(event, context):
             if method == "PUT" and len(parts) == 4 and parts[3] == "accounts":
                 if not is_superadmin(user_info):
                     return response(403, {"error": "Solo superadmin"})
+                if not validate_path_parameter(parts[2]):
+                    return response(400, {"error": "Invalid key_id format"})
                 return handle_update_key_accounts(parts[2], json.loads(event.get("body", "{}") or "{}"))
             if method == "DELETE" and len(parts) == 3:
+                if not validate_path_parameter(parts[2]):
+                    return response(400, {"error": "Invalid key_id format"})
                 return handle_delete_key(parts[2], event)
         return response(404, {"error": "Not found"})
     except Exception as e:
