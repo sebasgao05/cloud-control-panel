@@ -17,8 +17,13 @@ def get_ec2_client(account):
     if role_arn:
         sts = boto3.client("sts", region_name=region)
         creds = sts.assume_role(RoleArn=role_arn, RoleSessionName="CloudControlPanel")["Credentials"]
-        return boto3.client("ec2", region_name=region, aws_access_key_id=creds["AccessKeyId"],
-            aws_secret_access_key=creds["SecretAccessKey"], aws_session_token=creds["SessionToken"])
+        return boto3.client(
+            "ec2",
+            region_name=region,
+            aws_access_key_id=creds["AccessKeyId"],
+            aws_secret_access_key=creds["SecretAccessKey"],
+            aws_session_token=creds["SessionToken"],
+        )
     return boto3.client("ec2", region_name=region)
 
 
@@ -29,19 +34,35 @@ def get_ssm_client(account):
     if role_arn:
         sts = boto3.client("sts", region_name=region)
         creds = sts.assume_role(RoleArn=role_arn, RoleSessionName="CloudControlPanel")["Credentials"]
-        return boto3.client("ssm", region_name=region, aws_access_key_id=creds["AccessKeyId"],
-            aws_secret_access_key=creds["SecretAccessKey"], aws_session_token=creds["SessionToken"])
+        return boto3.client(
+            "ssm",
+            region_name=region,
+            aws_access_key_id=creds["AccessKeyId"],
+            aws_secret_access_key=creds["SecretAccessKey"],
+            aws_session_token=creds["SessionToken"],
+        )
     return boto3.client("ssm", region_name=region)
 
 
 def handle_list_accounts(user_info, config):
     """List accounts accessible to the user."""
     from auth import get_allowed_accounts
+
     accounts = get_allowed_accounts(user_info, config)
-    result = [{"id": a["id"], "name": a.get("name", a["id"]), "awsAccountId": a.get("awsAccountId", ""),
-               "region": a.get("region", REGION), "instanceCount": len(a.get("instances", [])),
-               "groupCount": len(a.get("groups", []))} for a in accounts]
-    return response(200, {"accounts": result, "user": user_info.get("name", ""), "role": user_info.get("role", "operator")})
+    result = [
+        {
+            "id": a["id"],
+            "name": a.get("name", a["id"]),
+            "awsAccountId": a.get("awsAccountId", ""),
+            "region": a.get("region", REGION),
+            "instanceCount": len(a.get("instances", [])),
+            "groupCount": len(a.get("groups", [])),
+        }
+        for a in accounts
+    ]
+    return response(
+        200, {"accounts": result, "user": user_info.get("name", ""), "role": user_info.get("role", "operator")}
+    )
 
 
 def handle_list_instances(account):
@@ -74,12 +95,19 @@ def handle_list_instances(account):
             delta = datetime.now(timezone.utc) - launch_time
             hours, remainder = divmod(int(delta.total_seconds()), 3600)
             uptime = f"{hours}h {remainder // 60}m"
-        result_instances.append({
-            "id": inst["id"], "name": inst.get("name", inst["id"]),
-            "instanceId": inst.get("instanceId", ""), "description": inst.get("description", ""),
-            "dashboardPort": inst.get("dashboardPort"), "group": inst.get("group"),
-            "state": state, "publicIp": live.get("publicIp"), "uptime": uptime,
-        })
+        result_instances.append(
+            {
+                "id": inst["id"],
+                "name": inst.get("name", inst["id"]),
+                "instanceId": inst.get("instanceId", ""),
+                "description": inst.get("description", ""),
+                "dashboardPort": inst.get("dashboardPort"),
+                "group": inst.get("group"),
+                "state": state,
+                "publicIp": live.get("publicIp"),
+                "uptime": uptime,
+            }
+        )
 
     groups = account.get("groups", [])
     result_groups = []
@@ -92,12 +120,26 @@ def handle_list_instances(account):
             group_state = "stopped"
         else:
             group_state = "partial"
-        result_groups.append({"id": grp["id"], "name": grp.get("name", grp["id"]),
-            "description": grp.get("description", ""), "color": grp.get("color", "#6366f1"),
-            "members": member_ids, "state": group_state})
+        result_groups.append(
+            {
+                "id": grp["id"],
+                "name": grp.get("name", grp["id"]),
+                "description": grp.get("description", ""),
+                "color": grp.get("color", "#6366f1"),
+                "members": member_ids,
+                "state": group_state,
+            }
+        )
 
-    return response(200, {"accountId": account["id"], "accountName": account.get("name", ""),
-                          "instances": result_instances, "groups": result_groups})
+    return response(
+        200,
+        {
+            "accountId": account["id"],
+            "accountName": account.get("name", ""),
+            "instances": result_instances,
+            "groups": result_groups,
+        },
+    )
 
 
 def handle_instance_status(account, instance):
@@ -112,17 +154,27 @@ def handle_instance_status(account, instance):
         delta = datetime.now(timezone.utc) - launch_time
         hours, remainder = divmod(int(delta.total_seconds()), 3600)
         uptime = f"{hours}h {remainder // 60}m"
-    return response(200, {"id": instance["id"], "name": instance.get("name", ""),
-        "instanceId": instance["instanceId"], "state": state,
-        "publicIp": inst_data.get("PublicIpAddress"), "uptime": uptime,
-        "dashboardPort": instance.get("dashboardPort"), "description": instance.get("description", ""),
-        "group": instance.get("group")})
+    return response(
+        200,
+        {
+            "id": instance["id"],
+            "name": instance.get("name", ""),
+            "instanceId": instance["instanceId"],
+            "state": state,
+            "publicIp": inst_data.get("PublicIpAddress"),
+            "uptime": uptime,
+            "dashboardPort": instance.get("dashboardPort"),
+            "description": instance.get("description", ""),
+            "group": instance.get("group"),
+        },
+    )
 
 
 def handle_instance_start(account, instance, user_info):
     """Start an EC2 instance."""
     from notifications import send_notifications
     from scheduler import log_activity
+
     ec2 = get_ec2_client(account)
     ec2.start_instances(InstanceIds=[instance["instanceId"]])
     logger.info(f"[ACTION] user={user_info['name']} action=START instance={instance['instanceId']}")
@@ -135,6 +187,7 @@ def handle_instance_stop(account, instance, user_info):
     """Stop an EC2 instance."""
     from notifications import send_notifications
     from scheduler import log_activity
+
     ec2 = get_ec2_client(account)
     ec2.stop_instances(InstanceIds=[instance["instanceId"]])
     logger.info(f"[ACTION] user={user_info['name']} action=STOP instance={instance['instanceId']}")
@@ -146,9 +199,17 @@ def handle_instance_stop(account, instance, user_info):
 def handle_instance_update(account, instance, user_info):
     """Run update command on an instance via SSM."""
     ssm = get_ssm_client(account)
-    cmd = ssm.send_command(InstanceIds=[instance["instanceId"]], DocumentName="AWS-RunShellScript",
-        Parameters={"commands": ['sudo -u ec2-user bash -lc "cd ~/app && git pull && bash install.sh"',
-                                 "sudo systemctl restart app"], "executionTimeout": ["600"]})
+    cmd = ssm.send_command(
+        InstanceIds=[instance["instanceId"]],
+        DocumentName="AWS-RunShellScript",
+        Parameters={
+            "commands": [
+                'sudo -u ec2-user bash -lc "cd ~/app && git pull && bash install.sh"',
+                "sudo systemctl restart app",
+            ],
+            "executionTimeout": ["600"],
+        },
+    )
     return response(200, {"message": "Update started", "commandId": cmd["Command"]["CommandId"]})
 
 
@@ -182,16 +243,30 @@ def handle_group_status(account, group):
     for res in desc.get("Reservations", []):
         for d in res.get("Instances", []):
             ci = imap.get(d["InstanceId"], {})
-            members.append({"id": ci.get("id"), "name": ci.get("name"), "instanceId": d["InstanceId"],
-                           "state": d["State"]["Name"], "publicIp": d.get("PublicIpAddress")})
+            members.append(
+                {
+                    "id": ci.get("id"),
+                    "name": ci.get("name"),
+                    "instanceId": d["InstanceId"],
+                    "state": d["State"]["Name"],
+                    "publicIp": d.get("PublicIpAddress"),
+                }
+            )
     states = [m["state"] for m in members]
-    gs = "running" if all(s == "running" for s in states) else "stopped" if all(s == "stopped" for s in states) else "partial"
+    gs = (
+        "running"
+        if all(s == "running" for s in states)
+        else "stopped"
+        if all(s == "stopped" for s in states)
+        else "partial"
+    )
     return response(200, {"group": group["id"], "name": group.get("name"), "state": gs, "members": members})
 
 
 def handle_group_start(account, group, user_info):
     """Start all instances in a group."""
     from notifications import send_notifications
+
     ec2 = get_ec2_client(account)
     started = []
     for mid in group.get("startOrder", []):
@@ -206,6 +281,7 @@ def handle_group_start(account, group, user_info):
 def handle_group_stop(account, group, user_info):
     """Stop all instances in a group."""
     from notifications import send_notifications
+
     ec2 = get_ec2_client(account)
     stopped = []
     for mid in group.get("stopOrder", []):

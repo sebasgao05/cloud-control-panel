@@ -56,7 +56,9 @@ def handle_get_schedule(account, user_info):
         return response(200, {"enabled": True, "permissions": {"view": False, "edit": False}, "schedule": None})
     schedule = account.get("schedule", {"timezone": "America/Bogota", "rules": []})
     instance_map = {inst["id"]: inst.get("name", inst["id"]) for inst in account.get("instances", [])}
-    return response(200, {"enabled": True, "permissions": permissions, "schedule": schedule, "instanceMap": instance_map})
+    return response(
+        200, {"enabled": True, "permissions": permissions, "schedule": schedule, "instanceMap": instance_map}
+    )
 
 
 def handle_update_schedule(account, account_id, user_info, body):
@@ -109,6 +111,7 @@ def handle_scheduler_event(event):
         return {"statusCode": 404, "body": "Account not found"}
 
     from ec2_ops import get_ec2_client
+
     ec2 = get_ec2_client(account)
     valid_ids = [iid for iid in instance_ids if iid]
 
@@ -190,11 +193,17 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
                 ScheduleExpressionTimezone=tz,
                 FlexibleTimeWindow={"Mode": "OFF"},
                 Target={
-                    "Arn": lambda_arn, "RoleArn": role_arn,
-                    "Input": json.dumps({
-                        "source": "scheduler", "action": "start",
-                        "accountId": account_id, "instanceIds": instance_ec2_ids, "ruleId": rule_id,
-                    }),
+                    "Arn": lambda_arn,
+                    "RoleArn": role_arn,
+                    "Input": json.dumps(
+                        {
+                            "source": "scheduler",
+                            "action": "start",
+                            "accountId": account_id,
+                            "instanceIds": instance_ec2_ids,
+                            "ruleId": rule_id,
+                        }
+                    ),
                 },
                 State="ENABLED",
             )
@@ -207,11 +216,17 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
                 ScheduleExpressionTimezone=tz,
                 FlexibleTimeWindow={"Mode": "OFF"},
                 Target={
-                    "Arn": lambda_arn, "RoleArn": role_arn,
-                    "Input": json.dumps({
-                        "source": "scheduler", "action": "start",
-                        "accountId": account_id, "instanceIds": instance_ec2_ids, "ruleId": rule_id,
-                    }),
+                    "Arn": lambda_arn,
+                    "RoleArn": role_arn,
+                    "Input": json.dumps(
+                        {
+                            "source": "scheduler",
+                            "action": "start",
+                            "accountId": account_id,
+                            "instanceIds": instance_ec2_ids,
+                            "ruleId": rule_id,
+                        }
+                    ),
                 },
                 State="ENABLED",
             )
@@ -226,11 +241,17 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
                 ScheduleExpressionTimezone=tz,
                 FlexibleTimeWindow={"Mode": "OFF"},
                 Target={
-                    "Arn": lambda_arn, "RoleArn": role_arn,
-                    "Input": json.dumps({
-                        "source": "scheduler", "action": "stop",
-                        "accountId": account_id, "instanceIds": instance_ec2_ids, "ruleId": rule_id,
-                    }),
+                    "Arn": lambda_arn,
+                    "RoleArn": role_arn,
+                    "Input": json.dumps(
+                        {
+                            "source": "scheduler",
+                            "action": "stop",
+                            "accountId": account_id,
+                            "instanceIds": instance_ec2_ids,
+                            "ruleId": rule_id,
+                        }
+                    ),
                 },
                 State="ENABLED",
             )
@@ -243,11 +264,17 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
                 ScheduleExpressionTimezone=tz,
                 FlexibleTimeWindow={"Mode": "OFF"},
                 Target={
-                    "Arn": lambda_arn, "RoleArn": role_arn,
-                    "Input": json.dumps({
-                        "source": "scheduler", "action": "stop",
-                        "accountId": account_id, "instanceIds": instance_ec2_ids, "ruleId": rule_id,
-                    }),
+                    "Arn": lambda_arn,
+                    "RoleArn": role_arn,
+                    "Input": json.dumps(
+                        {
+                            "source": "scheduler",
+                            "action": "stop",
+                            "accountId": account_id,
+                            "instanceIds": instance_ec2_ids,
+                            "ruleId": rule_id,
+                        }
+                    ),
                 },
                 State="ENABLED",
             )

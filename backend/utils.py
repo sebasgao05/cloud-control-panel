@@ -22,11 +22,21 @@ logger.setLevel(logging.INFO)
 
 # EC2 pricing (On-Demand, us-east-1, Linux, USD/hour)
 EC2_PRICING = {
-    "t3.nano": 0.0052, "t3.micro": 0.0104, "t3.small": 0.0208,
-    "t3.medium": 0.0416, "t3.large": 0.0832, "t3.xlarge": 0.1664,
-    "t2.micro": 0.0116, "t2.small": 0.023, "t2.medium": 0.0464,
-    "t2.large": 0.0928, "m5.large": 0.096, "m5.xlarge": 0.192,
-    "r5.large": 0.126, "r5.xlarge": 0.252, "c5.large": 0.085,
+    "t3.nano": 0.0052,
+    "t3.micro": 0.0104,
+    "t3.small": 0.0208,
+    "t3.medium": 0.0416,
+    "t3.large": 0.0832,
+    "t3.xlarge": 0.1664,
+    "t2.micro": 0.0116,
+    "t2.small": 0.023,
+    "t2.medium": 0.0464,
+    "t2.large": 0.0928,
+    "m5.large": 0.096,
+    "m5.xlarge": 0.192,
+    "r5.large": 0.126,
+    "r5.xlarge": 0.252,
+    "c5.large": 0.085,
     "c5.xlarge": 0.17,
 }
 
@@ -83,9 +93,11 @@ def decimal_to_native(obj):
 def load_config_from_db():
     """Load full config from DynamoDB (reconstructed)."""
     settings_item = db_get("CONFIG", "SETTINGS")
-    settings = decimal_to_native(settings_item.get("data", {})) if settings_item else {
-        "defaultRegion": "us-east-1", "pollIntervalSeconds": 30, "timezone": "America/Bogota"
-    }
+    settings = (
+        decimal_to_native(settings_item.get("data", {}))
+        if settings_item
+        else {"defaultRegion": "us-east-1", "pollIntervalSeconds": 30, "timezone": "America/Bogota"}
+    )
 
     key_items = db_query("CONFIG", "APIKEY#")
     api_keys = {}

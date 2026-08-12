@@ -296,9 +296,11 @@ def format_validation_errors(exc) -> list[dict[str, Any]]:
     """Format pydantic ValidationError into a list of error details."""
     errors = []
     for error in exc.errors():
-        errors.append({
-            "field": ".".join(str(loc) for loc in error["loc"]),
-            "message": error["msg"],
-            "type": error["type"],
-        })
+        errors.append(
+            {
+                "field": ".".join(str(loc) for loc in error["loc"]),
+                "message": error["msg"],
+                "type": error["type"],
+            }
+        )
     return errors

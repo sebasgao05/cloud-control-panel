@@ -62,7 +62,9 @@ def handle_test_notification(account, user_info, body):
     channel = next((ch for ch in channels if ch["id"] == channel_id), None)
     if not channel:
         return response(200, {"error": "Canal no encontrado"})
-    success = send_single_notification(channel, "test", "Notificacion de prueba - Cloud Control Panel", "Cloud Control Panel - Test")
+    success = send_single_notification(
+        channel, "test", "Notificacion de prueba - Cloud Control Panel", "Cloud Control Panel - Test"
+    )
     if success:
         return response(200, {"message": f"Prueba enviada a {channel.get('name')}"})
     return response(200, {"error": f"Error enviando a {channel.get('name')}"})

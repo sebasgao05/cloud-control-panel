@@ -5,6 +5,10 @@
 __pycache__/
 *.py[cod]
 .venv/
+.pytest_cache/
+htmlcov/
+*.egg-info/
+.coverage
 
 # IDE
 .vscode/

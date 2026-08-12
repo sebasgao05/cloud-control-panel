@@ -122,12 +122,15 @@ def handle_create_key(body):
     data["hash"] = key_hash.decode("utf-8")
 
     db_put({"PK": "CONFIG", "SK": f"APIKEY#{key_id}", "data": data})
-    return response(200, {
-        "message": "Key created",
-        "key": plaintext_key,
-        "key_id": key_id,
-        "note": "Save this key now. It cannot be retrieved again.",
-    })
+    return response(
+        200,
+        {
+            "message": "Key created",
+            "key": plaintext_key,
+            "key_id": key_id,
+            "note": "Save this key now. It cannot be retrieved again.",
+        },
+    )
 
 
 def handle_create_key_validated(body, user_info):
@@ -266,12 +269,28 @@ def handle_get_costs(account, user_info):
         cost = uptime_hours * hourly_rate
         total_cost += cost
         projection = (cost / days_elapsed) * 30 if days_elapsed > 0 else 0
-        costs.append({"id": inst["id"], "name": inst.get("name", inst["id"]),
-            "instanceType": instance_type, "hourlyRate": hourly_rate,
-            "uptimeHours": round(uptime_hours, 1), "costThisMonth": round(cost, 2),
-            "projection": round(projection, 2)})
+        costs.append(
+            {
+                "id": inst["id"],
+                "name": inst.get("name", inst["id"]),
+                "instanceType": instance_type,
+                "hourlyRate": hourly_rate,
+                "uptimeHours": round(uptime_hours, 1),
+                "costThisMonth": round(cost, 2),
+                "projection": round(projection, 2),
+            }
+        )
 
     total_projection = (total_cost / days_elapsed) * 30 if days_elapsed > 0 else 0
-    return response(200, {"enabled": True, "month": now.strftime("%B %Y"), "daysElapsed": days_elapsed,
-        "costs": costs, "totalCost": round(total_cost, 2),
-        "totalProjection": round(total_projection, 2), "currency": "USD"})
+    return response(
+        200,
+        {
+            "enabled": True,
+            "month": now.strftime("%B %Y"),
+            "daysElapsed": days_elapsed,
+            "costs": costs,
+            "totalCost": round(total_cost, 2),
+            "totalProjection": round(total_projection, 2),
+            "currency": "USD",
+        },
+    )

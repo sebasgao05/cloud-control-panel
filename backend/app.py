@@ -1,21 +1,53 @@
 """Cloud Control Panel - Lambda handler (router). Entry point: app.lambda_handler."""
+
 import json
 import os
 
 from pydantic import ValidationError
 
-from admin import (handle_create_account, handle_create_group, handle_create_instance,
-    handle_create_key_validated, handle_delete_account, handle_delete_group,
-    handle_delete_instance, handle_delete_key, handle_get_costs, handle_list_keys, handle_update_key_accounts)
+from admin import (
+    handle_create_account,
+    handle_create_group,
+    handle_create_instance,
+    handle_create_key_validated,
+    handle_delete_account,
+    handle_delete_group,
+    handle_delete_instance,
+    handle_delete_key,
+    handle_get_costs,
+    handle_list_keys,
+    handle_update_key_accounts,
+)
 from auth import authenticate, find_group, find_instance, get_allowed_accounts, is_admin, is_superadmin
-from ec2_ops import (handle_dashboard_url, handle_group_start, handle_group_status, handle_group_stop,
-    handle_instance_start, handle_instance_status, handle_instance_stop, handle_instance_update,
-    handle_list_accounts, handle_list_instances)
+from ec2_ops import (
+    handle_dashboard_url,
+    handle_group_start,
+    handle_group_status,
+    handle_group_stop,
+    handle_instance_start,
+    handle_instance_status,
+    handle_instance_stop,
+    handle_instance_update,
+    handle_list_accounts,
+    handle_list_instances,
+)
 from notifications import handle_get_notifications, handle_test_notification, handle_update_notifications
-from scheduler import (handle_clear_activity, handle_get_activity, handle_get_schedule,
-    handle_scheduler_event, handle_update_schedule)
-from utils import (CONFIG_PATH, is_db_initialized, load_config_from_db, logger,
-    migrate_json_to_db, migrate_plaintext_keys_to_bcrypt, response)
+from scheduler import (
+    handle_clear_activity,
+    handle_get_activity,
+    handle_get_schedule,
+    handle_scheduler_event,
+    handle_update_schedule,
+)
+from utils import (
+    CONFIG_PATH,
+    is_db_initialized,
+    load_config_from_db,
+    logger,
+    migrate_json_to_db,
+    migrate_plaintext_keys_to_bcrypt,
+    response,
+)
 from validators import ImportConfigRequest, format_validation_errors, validate_path_parameter
 
 
@@ -27,7 +59,7 @@ def lambda_handler(event, context):
     raw_path = event.get("rawPath", "/")
     stage = event.get("requestContext", {}).get("stage", "")
     if stage and stage != "$default" and raw_path.startswith(f"/{stage}"):
-        path = raw_path[len(f"/{stage}"):]
+        path = raw_path[len(f"/{stage}") :]
     else:
         path = raw_path
     if not path:
@@ -143,11 +175,15 @@ def lambda_handler(event, context):
             if len(parts) == 4 and parts[3] == "schedule" and method == "GET":
                 return handle_get_schedule(account, user_info)
             if len(parts) == 4 and parts[3] == "schedule" and method == "PUT":
-                return handle_update_schedule(account, account_id, user_info, json.loads(event.get("body", "{}") or "{}"))
+                return handle_update_schedule(
+                    account, account_id, user_info, json.loads(event.get("body", "{}") or "{}")
+                )
             if len(parts) == 4 and parts[3] == "notifications" and method == "GET":
                 return handle_get_notifications(account, user_info)
             if len(parts) == 4 and parts[3] == "notifications" and method == "PUT":
-                return handle_update_notifications(account, account_id, user_info, json.loads(event.get("body", "{}") or "{}"))
+                return handle_update_notifications(
+                    account, account_id, user_info, json.loads(event.get("body", "{}") or "{}")
+                )
             if len(parts) == 5 and parts[3:5] == ["notifications", "test"] and method == "POST":
                 return handle_test_notification(account, user_info, json.loads(event.get("body", "{}") or "{}"))
             if len(parts) == 4 and parts[3] == "costs" and method == "GET":
