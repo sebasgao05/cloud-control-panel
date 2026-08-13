@@ -225,7 +225,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub "cloud-control-oac-${StackTag}"
+        Name: !Sub "cloud-control-oac-${StackTag}-v2"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
