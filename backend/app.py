@@ -210,6 +210,13 @@ def lambda_handler(event, context):
                 if not validate_path_parameter(parts[2]):
                     return response(400, {"error": "Invalid key_id format"})
                 return handle_update_key_accounts(parts[2], json.loads(event.get("body", "{}") or "{}"))
+            if method == "PUT" and len(parts) == 3:
+                if not is_admin(user_info):
+                    return response(403, {"error": "Solo admin o superadmin"})
+                if not validate_path_parameter(parts[2]):
+                    return response(400, {"error": "Invalid key_id format"})
+                from admin import handle_update_key
+                return handle_update_key(parts[2], json.loads(event.get("body", "{}") or "{}"), user_info)
             if method == "DELETE" and len(parts) == 3:
                 if not validate_path_parameter(parts[2]):
                     return response(400, {"error": "Invalid key_id format"})

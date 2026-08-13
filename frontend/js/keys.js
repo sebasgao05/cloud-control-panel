@@ -258,8 +258,8 @@ export async function updateKeyPermissions(keyId) {
     const schedEdit = document.getElementById("key-sched-edit").checked;
 
     try {
-        await api("POST", "/keys/create", {
-            key: keyId, name, role, accounts,
+        await api("PUT", `/keys/${keyId}`, {
+            name, role, accounts,
             scheduler: { view: schedView, edit: schedEdit }
         });
         showToast("Permisos actualizados");

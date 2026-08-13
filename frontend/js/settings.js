@@ -5,7 +5,6 @@
 import { state, api, showToast } from './utils.js';
 import { loadSchedule } from './scheduler.js';
 import { loadNotifications } from './notifications.js';
-import { loadCosts } from './costs.js';
 import { loadKeys } from './keys.js';
 
 export function openSettingsPanel() {
@@ -13,8 +12,10 @@ export function openSettingsPanel() {
     document.getElementById("settings-panel").classList.add("open");
     loadSchedule();
     loadNotifications();
-    loadCosts();
     loadKeys();
+    // Hide costs section (feature disabled - requires persistent uptime tracking)
+    const costsSection = document.getElementById("settings-costs");
+    if (costsSection) costsSection.classList.add("hidden");
     // Export/Import only for superadmin
     const exportSection = document.getElementById("settings-export");
     if (exportSection) {

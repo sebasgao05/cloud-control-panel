@@ -227,6 +227,45 @@ def handle_update_key_accounts(key_id, body):
     return response(200, {"message": "Acceso actualizado", "accounts": data["accounts"]})
 
 
+def handle_update_key(key_id, body, user_info):
+    """Update an existing API key's metadata (name, role, accounts, scheduler permissions).
+
+    Does NOT change the key value or hash - only metadata.
+    """
+    item = db_get("CONFIG", f"APIKEY#{key_id}")
+    if not item:
+        return response(404, {"error": "Key no encontrada"})
+
+    data = item.get("data", {})
+    target_role = data.get("role", "operator")
+    caller_role = user_info.get("role", "operator")
+
+    # Permission checks
+    if caller_role == "admin" and target_role != "operator":
+        return response(403, {"error": "Un admin solo puede editar operadores"})
+    if caller_role == "superadmin" and target_role == "superadmin":
+        return response(403, {"error": "No puedes editar a otro superadmin"})
+
+    # Update allowed fields (never touch the hash)
+    if "name" in body:
+        data["name"] = body["name"][:100]
+    if "accounts" in body:
+        data["accounts"] = body["accounts"]
+    if "scheduler" in body:
+        data["scheduler"] = body["scheduler"]
+    # Role change: admin can only assign operator, superadmin can assign operator/admin
+    if "role" in body:
+        new_role = body["role"]
+        if caller_role == "admin" and new_role != "operator":
+            return response(403, {"error": "Un admin solo puede asignar rol de operador"})
+        if new_role == "superadmin":
+            return response(403, {"error": "No se puede escalar a superadmin"})
+        data["role"] = new_role
+
+    db_put({"PK": "CONFIG", "SK": f"APIKEY#{key_id}", "data": data})
+    return response(200, {"message": "Key actualizada"})
+
+
 def handle_get_costs(account, user_info):
     """Get cost estimation for an account."""
     features = account.get("features", {})
