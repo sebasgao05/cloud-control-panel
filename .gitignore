@@ -19,8 +19,14 @@ htmlcov/
 Thumbs.db
 
 # Configuracion real de cuentas (contiene datos sensibles - API keys, instance IDs, ARNs)
-config\accounts.json
+config/accounts.json
 config/accountsMono.json
+
+# Archivos sensibles genéricos (prevención)
+*.env
+.env.*
+secrets.*
+credentials.*
 
 # Bundled config in backend (generated during deploy)
 backend/accounts.json
