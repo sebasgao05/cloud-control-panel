@@ -50,92 +50,223 @@ Usuario -> CloudFront -> S3 (frontend estático, ES6 modules)
 | Crear admins | ✅ | ❌ | ❌ |
 | Exportar/Importar config | ✅ | ❌ | ❌ |
 
-## Inicio rapido
+## Inicio rapido — Guia paso a paso
+
+Este proyecto es para que cada persona lo clone y despliegue su propia instancia en su cuenta AWS.
+No es una plataforma compartida — cada uno tiene su propio panel independiente.
 
 ### Prerequisitos
 
-- AWS CLI configurado con una cuenta (IAM user o SSO con permisos de admin)
-- Python 3.13+
-- pip
+- Una cuenta AWS activa
+- AWS CLI instalado y configurado (`aws configure`)
+- Python 3.13+ con pip
+- Permisos IAM: CloudFormation, Lambda, S3, CloudFront, DynamoDB, API Gateway, IAM, EventBridge, EC2, SSM, STS
 
-### 1. Clonar el repositorio
+---
+
+### Paso 1: Clonar el repositorio
 
 ```bash
-git clone https://github.com/<tu-usuario>/cloud-control-panel.git
+git clone https://github.com/sebasgao05/cloud-control-panel.git
 cd cloud-control-panel
 ```
 
-### 2. Configurar cuentas e instancias
+---
 
-**Multi-cuenta** (varias cuentas AWS con roles cross-account):
+### Paso 2: Crear tu archivo de configuracion
+
+Copia la plantilla que se ajuste a tu caso:
+
+**Si tienes varias cuentas AWS:**
 ```bash
+# Windows
 copy config\accounts.example.json config\accounts.json
+
+# Linux/macOS
+cp config/accounts.example.json config/accounts.json
 ```
 
-**Mono-cuenta** (una sola cuenta AWS):
+**Si tienes una sola cuenta AWS:**
 ```bash
+# Windows
 copy config\accountsMono.example.json config\accounts.json
+
+# Linux/macOS
+cp config/accountsMono.example.json config/accounts.json
 ```
 
-Edita `config/accounts.json` con tus datos reales:
-- Cambia los `CHANGE_ME_*` de apiKeys por valores seguros (UUIDs recomendado)
-- Pon tus Instance IDs reales (`i-0xxxx`)
-- Pon tu AWS Account ID de 12 digitos
-- Si es multi-cuenta, pon el ARN del rol cross-account
+---
 
-> **Importante:** Este archivo contiene datos sensibles (API keys, IDs). Está en `.gitignore` y NUNCA se commitea.
+### Paso 3: Editar tu configuracion
 
-### 3. (Solo multi-cuenta) Crear roles remotos
+Abre `config/accounts.json` y reemplaza los valores de ejemplo con tus datos reales:
 
-Crea el rol `CloudControlRemoteAccess` en cada cuenta remota.
-Ver [docs/cross-account-setup.md](docs/cross-account-setup.md).
+#### 3.1 — API Keys (seccion `apiKeys`)
 
-### 4. Desplegar
+```json
+"apiKeys": {
+  "mi-clave-secreta-uuid-aqui": {
+    "name": "Tu Nombre",
+    "role": "superadmin",
+    "accounts": ["*"]
+  }
+}
+```
 
-**PowerShell (Windows):**
+- La key (ej: `mi-clave-secreta-uuid-aqui`) es lo que usaras para ingresar al panel
+- Usa un UUID seguro. Puedes generar uno con: `python -c "import uuid; print(uuid.uuid4())"`
+- El primer superadmin DEBE crearse aqui. Despues se pueden crear admins/operadores desde el panel
+
+#### 3.2 — Cuentas AWS (seccion `accounts`)
+
+```json
+"accounts": [
+  {
+    "id": "mi-proyecto",
+    "name": "Produccion - Mi Proyecto",
+    "awsAccountId": "123456789012",
+    "region": "us-east-1",
+    "crossAccountRoleArn": null,
+    "features": {
+      "scheduler": true,
+      "notifications": true,
+      "costEstimate": true
+    }
+  }
+]
+```
+
+- `id`: identificador unico (sin espacios, solo letras/numeros/guiones)
+- `awsAccountId`: tu Account ID de 12 digitos (lo ves en la consola AWS arriba a la derecha)
+- `crossAccountRoleArn`: dejalo en `null` si es la misma cuenta donde despliegas. Solo se usa para multi-cuenta
+- `features`: activa/desactiva scheduler, notificaciones y costos por cuenta
+
+#### 3.3 — Instancias EC2
+
+```json
+"instances": [
+  {
+    "id": "mi-server",
+    "name": "Servidor Principal",
+    "instanceId": "i-0abc123def456789",
+    "description": "Backend de produccion",
+    "dashboardPort": null,
+    "group": null
+  }
+]
+```
+
+- `instanceId`: el ID real de tu instancia EC2 (lo ves en la consola EC2, empieza con `i-`)
+- `dashboardPort`: si la instancia tiene un servicio web, pon el puerto. Si no, dejalo en `null`
+- `group`: si quieres agrupar instancias, pon el ID del grupo. Si no, dejalo en `null`
+
+> ⚠️ **IMPORTANTE:** Este archivo contiene tus API keys y datos de infraestructura.
+> Esta en `.gitignore` y NUNCA se debe commitear al repositorio.
+
+---
+
+### Paso 4: (Solo multi-cuenta) Crear rol en cuentas remotas
+
+Si vas a gestionar instancias en OTRAS cuentas AWS, necesitas crear un rol IAM en cada cuenta remota.
+Ver [docs/cross-account-setup.md](docs/cross-account-setup.md) para instrucciones detalladas.
+
+Si solo usas una cuenta, salta este paso.
+
+---
+
+### Paso 5: Desplegar
+
+**Windows (PowerShell):**
 ```powershell
 .\deploy.ps1 -StackTag "ccp-main"
 ```
 
-**Bash (Linux/macOS/CI):**
+**Linux/macOS/WSL:**
 ```bash
 chmod +x deploy.sh
 ./deploy.sh --stack-tag ccp-main
 ```
 
-El script hace todo automaticamente:
-1. Crea bucket S3 de deploy si no existe
-2. Instala dependencias Python para Lambda (Linux arm64)
-3. Copia tu `config/accounts.json` al bundle de Lambda (temporal)
-4. Empaqueta y despliega CloudFormation
-5. Sube el frontend a S3 + invalida cache CloudFront
-6. Limpia archivos temporales del directorio backend/
+El script automaticamente:
+1. Crea un bucket S3 para el deploy (si no existe)
+2. Instala las dependencias Python para Lambda (Linux arm64)
+3. Empaqueta tu codigo + config con CloudFormation
+4. Despliega toda la infraestructura (Lambda, API Gateway, DynamoDB, S3, CloudFront)
+5. Sube el frontend a S3 e invalida el cache de CloudFront
+6. Limpia archivos temporales
 
-### 5. Usar
+Al finalizar te muestra la URL de tu panel:
+```
+========================================
+ DEPLOY COMPLETE!
+========================================
 
-Ingresa al URL que devuelve el deploy con tu API key configurada.
-En el primer request, la Lambda migra automaticamente el JSON a DynamoDB.
-A partir de ahi, todos los cambios se hacen desde el panel sin necesidad de re-deploy.
-
-> **Nota:** `config/accounts.json` solo se usa en el PRIMER deploy. Despues de la migracion
-> a DynamoDB, toda la config se gestiona desde el panel. Si necesitas re-migrar,
-> usa el endpoint `POST /api/migrate` con una key de superadmin.
-
-### 6. (Opcional) Deploy de staging para probar
-
-Si quieres probar antes de ir a produccion, despliega con otro StackTag:
-
-```powershell
-.\deploy.ps1 -StackTag "ccp-staging"
+ Panel URL: https://xxxxxx.cloudfront.net
 ```
 
-Esto crea un stack completamente aislado. Para eliminarlo cuando ya no lo necesites:
+---
+
+### Paso 6: Ingresar al panel
+
+1. Abre la URL que te dio el deploy
+2. Ingresa la API Key que configuraste en el paso 3.1
+3. La primera vez, la Lambda migra automaticamente tu `accounts.json` a DynamoDB
+4. A partir de ahi, todos los cambios se hacen desde el panel (sin necesidad de re-deploy)
+
+> **Nota:** Despues del primer deploy, tu `config/accounts.json` ya no se necesita.
+> Todo se gestiona desde el panel web (crear cuentas, instancias, keys, etc.).
+> Si necesitas re-migrar, usa el endpoint `POST /api/migrate` con una key de superadmin.
+
+---
+
+### Paso 7: (Opcional) Configurar CI/CD con GitHub Actions
+
+Si quieres que los cambios se desplieguen automaticamente:
+
+1. Ve a tu repo en GitHub → **Settings → Secrets and variables → Actions**
+2. Agrega estos **Repository secrets**:
+
+| Secret | Valor |
+|--------|-------|
+| `AWS_ACCESS_KEY_ID` | Tu Access Key de AWS |
+| `AWS_SECRET_ACCESS_KEY` | Tu Secret Key de AWS |
+| `ACCOUNTS_JSON` | El contenido completo de tu `config/accounts.json` |
+
+3. (Opcional) Crea estos **Environments** en Settings → Environments:
+   - `staging` — sin protecciones
+   - `staging-approve` — con **Required reviewers** (tu usuario)
+   - `production` — con **Required reviewers** (opcional)
+
+Con esto configurado:
+- Cada **Pull Request** despliega un staging efimero para probar
+- Al **mergear a main** se despliega automaticamente a produccion
+- Los **tags** (`v1.0.0`) crean un GitHub Release
+
+---
+
+### Paso 8: (Opcional) Probar en staging antes de produccion
+
+Si prefieres probar en un ambiente aislado antes del deploy definitivo:
 
 ```powershell
-# Vaciar bucket S3 del staging
+# Desplegar staging (stack completamente separado de produccion)
+.\deploy.ps1 -StackTag "ccp-staging"
+
+# Cuando termines de probar, eliminar staging:
 aws s3 rm s3://cloud-control-ccp-staging-<tu-account-id> --recursive
-# Eliminar stack
 aws cloudformation delete-stack --stack-name cloud-control-ccp-staging --region us-east-1
+```
+
+---
+
+### Resumen del flujo
+
+```
+1. Clonar repo
+2. Crear config/accounts.json con tus datos reales
+3. Ejecutar deploy.ps1 o deploy.sh
+4. Abrir la URL → ingresar con tu API key
+5. (Opcional) Configurar CI/CD en GitHub con los 3 secrets
 ```
 
 ## Desarrollo local (Mock)
@@ -236,11 +367,26 @@ cloud-control-panel/
 
 El pipeline esta en `.github/workflows/`:
 
+### Configuracion requerida (GitHub Secrets)
+
+Para que el CI/CD funcione, configura estos secrets en tu repo:
+**Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Descripcion |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | Access Key de IAM con permisos de deploy |
+| `AWS_SECRET_ACCESS_KEY` | Secret Key del mismo IAM user |
+| `ACCOUNTS_JSON` | Contenido completo de tu `config/accounts.json` |
+
+El secret `ACCOUNTS_JSON` es el mismo archivo que creas localmente para tu primer deploy.
+El CI lo reconstruye en runtime para no commitear datos sensibles al repo.
+
 ### En Pull Requests (staging efímero):
 1. **Lint** → `ruff check` + `ruff format --check`
 2. **Test** → `pytest` con coverage
-3. **Deploy Staging** → Despliega un stack aislado (`ccp-staging-prN`) y comenta la URL en el PR
-4. **Destroy Staging** → Al cerrar/mergear el PR, elimina el stack automaticamente
+3. **Deploy Staging** → Despliega un stack aislado (`ccp-staging-prN`) con tu config real
+4. **Approve Staging** → Espera aprobación manual (environment `staging-approve`)
+5. **Destroy Staging** → Al aprobar, elimina el stack automaticamente
 
 ### En push a main (producción):
 1. **Lint** → `ruff check`
@@ -249,6 +395,13 @@ El pipeline esta en `.github/workflows/`:
 
 ### En tags `v*.*.*`:
 - Crea GitHub Release con release notes automaticas
+
+### Environments de GitHub (opcional pero recomendado)
+
+Crea estos environments en **Settings → Environments**:
+- `staging` — sin protecciones
+- `staging-approve` — con **Required reviewers** (tu usuario)
+- `production` — con **Required reviewers** (opcional)
 
 ### Comandos locales (Makefile)
 

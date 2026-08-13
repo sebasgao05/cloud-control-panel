@@ -87,8 +87,8 @@ jobs:
           echo "stack-name=${STACK_NAME}" >> "$GITHUB_OUTPUT"
           echo "stack-tag=${STACK_TAG}" >> "$GITHUB_OUTPUT"
 
-          # Create config for staging (uses example config)
-          cp config/accounts.example.json config/accounts.json
+          # Reconstruct accounts.json from secret
+          echo '${{ secrets.ACCOUNTS_JSON }}' > config/accounts.json
 
           # Deploy
           chmod +x deploy.sh
@@ -196,5 +196,8 @@ jobs:
 
       - name: Deploy to production
         run: |
+          # Reconstruct accounts.json from secret
+          echo '${{ secrets.ACCOUNTS_JSON }}' > config/accounts.json
+
           chmod +x deploy.sh
           ./deploy.sh --stack-tag ccp-main --env prod
