@@ -12,7 +12,6 @@ import { showAddInstanceForm, showInlineGroupCreate, cancelInstanceForm, saveIns
 import { openSettingsPanel, closeSettingsPanel, toggleSettingsSection, exportConfig, importConfig } from './js/settings.js';
 import { showAddRuleForm, editRule, saveRule, toggleRule, deleteRule, cancelRuleForm } from './js/scheduler.js';
 import { showAddChannelForm, editChannel, saveChannel, toggleChannel, deleteChannel, testChannel, updateChannelFields, cancelChannelForm } from './js/notifications.js';
-import { loadCosts } from './js/costs.js';
 import { showAddKeyForm, cancelKeyForm, saveKey, copyKey, closeKeyResult, deleteKey, toggleAllAccounts, editKeyPermissions, updateKeyPermissions } from './js/keys.js';
 
 // Attach all functions to window for HTML onclick handlers
