@@ -36,9 +36,10 @@ export function renderKeys(keys) {
     container.innerHTML = keys.map(k => {
         const roleColors = { superadmin: "#f87171", admin: "#fbbf24", operator: "#34d399" };
         const roleColor = roleColors[k.role] || "#a1a1b5";
-        const maskedKey = k.key.substring(0, 8) + "..." + k.key.substring(k.key.length - 4);
+        const maskedKey = k.key_preview || (k.key_id ? k.key_id.substring(0, 8) + "..." : "???");
         const accountsStr = (k.accounts || []).join(", ");
-        const isSelf = k.key === state.apiKey;
+        const keyRef = k.key_id || k.key || "";
+        const isSelf = false; // Can't determine self with hashed keys
 
         // Delete button logic:
         // - Never show for self
@@ -64,13 +65,12 @@ export function renderKeys(keys) {
                 <div class="rule-info">
                     <span class="rule-description">${escapeHtml(k.name || 'Sin nombre')}</span>
                     <span class="notif-type-badge" style="background:${roleColor}20;color:${roleColor}">${k.role || 'operator'}</span>
-                    ${isSelf ? '<span class="notif-type-badge" style="background:#6366f120;color:#6366f1">Tu</span>' : ''}
                 </div>
                 <div class="rule-actions">
-                    ${canEdit ? `<button class="btn-icon btn-icon-sm" onclick="editKeyPermissions('${k.key}')" title="Editar permisos">
+                    ${canEdit ? `<button class="btn-icon btn-icon-sm" onclick="editKeyPermissions('${keyRef}')" title="Editar permisos">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>` : ''}
-                    ${canDelete ? `<button class="btn-icon btn-icon-sm btn-icon-danger" onclick="deleteKey('${k.key}')" title="Eliminar">
+                    ${canDelete ? `<button class="btn-icon btn-icon-sm btn-icon-danger" onclick="deleteKey('${keyRef}')" title="Eliminar">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>` : ''}
                 </div>
@@ -203,7 +203,7 @@ export async function editKeyPermissions(keyId) {
         keysData = await api("GET", "/keys/list");
     } catch (e) { showToast("Error cargando keys"); return; }
 
-    const keyData = (keysData.keys || []).find(k => k.key === keyId);
+    const keyData = (keysData.keys || []).find(k => k.key_id === keyId);
     if (!keyData) { showToast("Key no encontrada"); return; }
 
     const form = document.getElementById("key-form");
