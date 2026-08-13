@@ -2,46 +2,62 @@
 Cloud Control Panel - Authentication and authorization helpers.
 """
 
+import hashlib
+import time
+
 import bcrypt
 
 from utils import logger
 
+# In-memory auth cache (persists across warm Lambda invocations).
+# Maps SHA-256(provided_key) -> (user_info_dict, expiry_timestamp)
+# TTL: 5 minutes. This avoids repeated bcrypt comparisons for the same key.
+_auth_cache = {}
+_AUTH_CACHE_TTL = 300  # seconds
+
 
 def authenticate(event, config):
     """
-    Authenticate request via x-api-key header.
+    Authenticate request via x-api-key header with in-memory caching.
 
-    After migration to bcrypt hashing, keys are stored as:
-        PK=CONFIG, SK=APIKEY#{key_id}, data={hash: bcrypt_hash, name, role, accounts[], ...}
-
-    We iterate all stored keys and use bcrypt.checkpw to find a match.
-    This is acceptable for a single-user/small-team system.
-
-    Note: The mock server (mock/server.py) continues to use plaintext key lookup
-    for local development since it does not use DynamoDB or bcrypt.
+    Uses SHA-256 of the provided key as cache key to avoid storing
+    plaintext keys in memory. Cache TTL is 5 minutes.
     """
     headers = event.get("headers", {})
     provided_key = headers.get("x-api-key", "")
     if not provided_key:
         return None
 
+    # Check cache first (avoids expensive bcrypt on every request)
+    cache_key = hashlib.sha256(provided_key.encode("utf-8")).hexdigest()
+    cached = _auth_cache.get(cache_key)
+    if cached:
+        user_info, expiry = cached
+        if time.time() < expiry:
+            return user_info
+        else:
+            del _auth_cache[cache_key]
+
+    # Cache miss: iterate keys and check bcrypt
     api_keys = config.get("apiKeys", {})
 
     for key_id, key_data in api_keys.items():
         stored_hash = key_data.get("hash")
         if stored_hash:
-            # Migrated key: validate via bcrypt
             try:
                 if isinstance(stored_hash, str):
                     stored_hash = stored_hash.encode("utf-8")
                 if bcrypt.checkpw(provided_key.encode("utf-8"), stored_hash):
+                    # Cache the successful auth
+                    _auth_cache[cache_key] = (key_data, time.time() + _AUTH_CACHE_TTL)
                     return key_data
             except (ValueError, TypeError) as e:
                 logger.error(f"[AUTH] bcrypt check failed for key_id={key_id}: {e}")
                 continue
         else:
-            # Legacy plaintext key (pre-migration): key_id IS the plaintext key
+            # Legacy plaintext key (pre-migration)
             if key_id == provided_key:
+                _auth_cache[cache_key] = (key_data, time.time() + _AUTH_CACHE_TTL)
                 return key_data
 
     return None
