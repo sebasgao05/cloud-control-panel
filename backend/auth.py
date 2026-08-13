@@ -16,6 +16,11 @@ _auth_cache = {}
 _AUTH_CACHE_TTL = 300  # seconds
 
 
+def clear_auth_cache():
+    """Clear the auth cache. Used in tests."""
+    _auth_cache.clear()
+
+
 def authenticate(event, config):
     """
     Authenticate request via x-api-key header with in-memory caching.
