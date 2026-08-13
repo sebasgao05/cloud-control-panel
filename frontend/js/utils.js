@@ -28,22 +28,20 @@ export async function api(method, path, body = null) {
     };
     if (body) opts.body = JSON.stringify(body);
 
-    const res = await fetch(`${API_BASE}${path}`, opts);
+    let res;
+    try {
+        res = await fetch(`${API_BASE}${path}`, opts);
+    } catch (e) {
+        throw new Error("NetworkError");
+    }
 
     if (res.status === 401) {
-        showToast("API Key invalida");
-        // Dynamic import to avoid circular dependency
-        const { logout } = await import('./auth.js');
-        logout();
         throw new Error("Unauthorized");
     }
 
     // Don't logout on 403 for non-GET requests (permission denied for action)
     if (res.status === 403 && method === "GET") {
-        showToast("Sin permisos");
-        const { logout } = await import('./auth.js');
-        logout();
-        throw new Error("Unauthorized");
+        throw new Error("Forbidden");
     }
 
     const data = await res.json();

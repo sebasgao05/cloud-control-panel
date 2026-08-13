@@ -48,7 +48,6 @@ async function checkSettingsVisibility() {
 
     btn.classList.add("hidden");
 }
-}
 
 export function renderGroups(groups) {
     const section = document.getElementById("groups-section");

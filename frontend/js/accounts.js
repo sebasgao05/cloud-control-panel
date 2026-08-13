@@ -31,7 +31,11 @@ export async function loadAccounts() {
 
         showScreen("accounts-screen");
     } catch (e) {
-        if (e.message !== "Unauthorized") {
+        if (e.message === "Unauthorized" || e.message === "Forbidden") {
+            showToast("Sesión expirada");
+            const { logout } = await import('./auth.js');
+            logout();
+        } else {
             showToast("Error cargando cuentas");
         }
     }
