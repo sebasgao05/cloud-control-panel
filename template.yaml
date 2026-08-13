@@ -9,6 +9,22 @@ Parameters:
     Type: String
     Default: ccp-main
     Description: Unique tag for naming resources
+  ProjectTag:
+    Type: String
+    Default: cloud-control-panel
+    Description: Project name for cost allocation tagging
+  EnvironmentTag:
+    Type: String
+    Default: production
+    Description: Environment (production, staging, dev)
+  OwnerTag:
+    Type: String
+    Default: platform-team
+    Description: Team or person owning this stack
+  CostCenterTag:
+    Type: String
+    Default: cloud-ops
+    Description: Cost center for billing separation
 
 Resources:
   # ─── DynamoDB: Config Store ───────────────────────────────────────────
@@ -28,6 +44,17 @@ Resources:
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: database
 
   # ─── Backend: Lambda ──────────────────────────────────────────────────
 
@@ -35,6 +62,17 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "cloud-control-lambda-${StackTag}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: iam
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -88,6 +126,7 @@ Resources:
                   - scheduler:DeleteSchedule
                   - scheduler:GetSchedule
                   - scheduler:ListSchedules
+                  - scheduler:TagResource
                 Resource: "*"
               # Pass role (for scheduler to invoke Lambda)
               - Effect: Allow
@@ -102,6 +141,17 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "cloud-control-scheduler-${StackTag}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: iam
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -132,12 +182,27 @@ Resources:
       Timeout: 30
       Role: !GetAtt ControlFunctionRole.Arn
       Code: backend/
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: compute
       Environment:
         Variables:
           STACK_TAG: !Ref StackTag
           CONFIG_TABLE: !Ref ConfigTable
           SCHEDULER_ROLE_ARN: !GetAtt SchedulerExecutionRole.Arn
           LAMBDA_ARN: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cloud-control-${StackTag}"
+          PROJECT_TAG: !Ref ProjectTag
+          ENVIRONMENT_TAG: !Ref EnvironmentTag
+          OWNER_TAG: !Ref OwnerTag
+          COST_CENTER_TAG: !Ref CostCenterTag
 
   # ─── HTTP API (API Gateway v2) ───────────────────────────────────────
 
@@ -146,6 +211,12 @@ Resources:
     Properties:
       Name: !Sub "cloud-control-api-${StackTag}"
       ProtocolType: HTTP
+      Tags:
+        Project: !Ref ProjectTag
+        Environment: !Ref EnvironmentTag
+        Owner: !Ref OwnerTag
+        CostCenter: !Ref CostCenterTag
+        Component: api
       CorsConfiguration:
         AllowOrigins:
           - "*"
@@ -198,6 +269,17 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "cloud-control-${StackTag}-${AWS::AccountId}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: frontend
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -233,6 +315,17 @@ Resources:
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: CostCenter
+          Value: !Ref CostCenterTag
+        - Key: Component
+          Value: cdn
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html

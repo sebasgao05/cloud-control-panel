@@ -1,0 +1,10 @@
+{
+  "description": "Tags de AWS para separación de facturación por proyecto. Estos tags se aplican a todos los recursos del stack y a los recursos creados dinámicamente (EventBridge Schedules). Activa 'Project' y 'Environment' como Cost Allocation Tags en AWS Billing > Cost Allocation Tags.",
+  "tags": {
+    "Project": "cloud-control-panel",
+    "Environment": "production",
+    "ManagedBy": "cloudformation",
+    "Owner": "platform-team",
+    "CostCenter": "cloud-ops"
+  }
+}

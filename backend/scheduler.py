@@ -16,6 +16,18 @@ from utils import REGION, db_delete, db_put, db_query, decimal_to_native, load_c
 from validators import UpdateScheduleRequest, format_validation_errors
 
 
+def get_resource_tags():
+    """Get standard tags from environment for dynamic resources."""
+    return [
+        {"Key": "Project", "Value": os.environ.get("PROJECT_TAG", "cloud-control-panel")},
+        {"Key": "Environment", "Value": os.environ.get("ENVIRONMENT_TAG", "production")},
+        {"Key": "Owner", "Value": os.environ.get("OWNER_TAG", "platform-team")},
+        {"Key": "CostCenter", "Value": os.environ.get("COST_CENTER_TAG", "cloud-ops")},
+        {"Key": "ManagedBy", "Value": "lambda-scheduler"},
+        {"Key": "Component", "Value": "scheduler"},
+    ]
+
+
 def log_activity(account_id, action, user_name, instance_ids, rule_id=None):
     """Log an activity event to DynamoDB."""
     ts = datetime.now(timezone.utc).isoformat()
@@ -183,101 +195,65 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
                 instance_ec2_ids.append(inst.get("instanceId", ""))
                 break
 
+    tags = get_resource_tags()
+
     start_cron = cron_to_eventbridge(rule.get("startCron", ""), tz)
     if start_cron:
+        schedule_params = {
+            "Name": f"{stack_tag}-{account_id}-{rule_id}-start",
+            "GroupName": "default",
+            "ScheduleExpression": start_cron,
+            "ScheduleExpressionTimezone": tz,
+            "FlexibleTimeWindow": {"Mode": "OFF"},
+            "Target": {
+                "Arn": lambda_arn,
+                "RoleArn": role_arn,
+                "Input": json.dumps(
+                    {
+                        "source": "scheduler",
+                        "action": "start",
+                        "accountId": account_id,
+                        "instanceIds": instance_ec2_ids,
+                        "ruleId": rule_id,
+                    }
+                ),
+            },
+            "State": "ENABLED",
+        }
         try:
-            scheduler.create_schedule(
-                Name=f"{stack_tag}-{account_id}-{rule_id}-start",
-                GroupName="default",
-                ScheduleExpression=start_cron,
-                ScheduleExpressionTimezone=tz,
-                FlexibleTimeWindow={"Mode": "OFF"},
-                Target={
-                    "Arn": lambda_arn,
-                    "RoleArn": role_arn,
-                    "Input": json.dumps(
-                        {
-                            "source": "scheduler",
-                            "action": "start",
-                            "accountId": account_id,
-                            "instanceIds": instance_ec2_ids,
-                            "ruleId": rule_id,
-                        }
-                    ),
-                },
-                State="ENABLED",
-            )
+            scheduler.create_schedule(**schedule_params, Tags=tags)
             logger.info(f"[SCHEDULER] Created start schedule for {rule_id}")
         except scheduler.exceptions.ConflictException:
-            scheduler.update_schedule(
-                Name=f"{stack_tag}-{account_id}-{rule_id}-start",
-                GroupName="default",
-                ScheduleExpression=start_cron,
-                ScheduleExpressionTimezone=tz,
-                FlexibleTimeWindow={"Mode": "OFF"},
-                Target={
-                    "Arn": lambda_arn,
-                    "RoleArn": role_arn,
-                    "Input": json.dumps(
-                        {
-                            "source": "scheduler",
-                            "action": "start",
-                            "accountId": account_id,
-                            "instanceIds": instance_ec2_ids,
-                            "ruleId": rule_id,
-                        }
-                    ),
-                },
-                State="ENABLED",
-            )
+            scheduler.update_schedule(**schedule_params)
 
     stop_cron = cron_to_eventbridge(rule.get("stopCron", ""), tz)
     if stop_cron:
+        schedule_params = {
+            "Name": f"{stack_tag}-{account_id}-{rule_id}-stop",
+            "GroupName": "default",
+            "ScheduleExpression": stop_cron,
+            "ScheduleExpressionTimezone": tz,
+            "FlexibleTimeWindow": {"Mode": "OFF"},
+            "Target": {
+                "Arn": lambda_arn,
+                "RoleArn": role_arn,
+                "Input": json.dumps(
+                    {
+                        "source": "scheduler",
+                        "action": "stop",
+                        "accountId": account_id,
+                        "instanceIds": instance_ec2_ids,
+                        "ruleId": rule_id,
+                    }
+                ),
+            },
+            "State": "ENABLED",
+        }
         try:
-            scheduler.create_schedule(
-                Name=f"{stack_tag}-{account_id}-{rule_id}-stop",
-                GroupName="default",
-                ScheduleExpression=stop_cron,
-                ScheduleExpressionTimezone=tz,
-                FlexibleTimeWindow={"Mode": "OFF"},
-                Target={
-                    "Arn": lambda_arn,
-                    "RoleArn": role_arn,
-                    "Input": json.dumps(
-                        {
-                            "source": "scheduler",
-                            "action": "stop",
-                            "accountId": account_id,
-                            "instanceIds": instance_ec2_ids,
-                            "ruleId": rule_id,
-                        }
-                    ),
-                },
-                State="ENABLED",
-            )
+            scheduler.create_schedule(**schedule_params, Tags=tags)
             logger.info(f"[SCHEDULER] Created stop schedule for {rule_id}")
         except scheduler.exceptions.ConflictException:
-            scheduler.update_schedule(
-                Name=f"{stack_tag}-{account_id}-{rule_id}-stop",
-                GroupName="default",
-                ScheduleExpression=stop_cron,
-                ScheduleExpressionTimezone=tz,
-                FlexibleTimeWindow={"Mode": "OFF"},
-                Target={
-                    "Arn": lambda_arn,
-                    "RoleArn": role_arn,
-                    "Input": json.dumps(
-                        {
-                            "source": "scheduler",
-                            "action": "stop",
-                            "accountId": account_id,
-                            "instanceIds": instance_ec2_ids,
-                            "ruleId": rule_id,
-                        }
-                    ),
-                },
-                State="ENABLED",
-            )
+            scheduler.update_schedule(**schedule_params)
 
 
 def delete_eventbridge_schedule(account_id, rule_id, action_type):
