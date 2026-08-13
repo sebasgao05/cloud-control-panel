@@ -1,0 +1,7 @@
+pytest>=7.0
+pytest-cov
+moto[dynamodb]>=5.0
+requests
+ruff
+mypy
+boto3-stubs[dynamodb,ec2,ssm,scheduler]

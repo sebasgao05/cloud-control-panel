@@ -29,8 +29,10 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  OK" -ForegroundColor Green
 
 # Step 2: Copy accounts.json to backend (bundled with Lambda)
-Write-Host "[2/6] Bundling config with Lambda..." -ForegroundColor Yellow
+Write-Host "[2/6] Bundling config and dependencies with Lambda..." -ForegroundColor Yellow
 Copy-Item "config\accounts.json" "backend\accounts.json" -Force
+# Install Python dependencies for Linux arm64 (Lambda runtime)
+pip install -r backend/requirements.txt -t backend/ --upgrade --quiet --platform manylinux2014_aarch64 --implementation cp --python-version 3.13 --only-binary=:all: 2>$null
 Write-Host "  OK" -ForegroundColor Green
 
 # Step 3: Package CloudFormation
@@ -74,8 +76,11 @@ aws s3 sync frontend/ "s3://$bucketName/" --delete --region $Region | Out-Null
 aws cloudfront create-invalidation --distribution-id $distributionId --paths "/*" | Out-Null
 Write-Host "  OK" -ForegroundColor Green
 
-# Cleanup bundled config
+# Cleanup bundled config and installed dependencies
 Remove-Item "backend\accounts.json" -ErrorAction SilentlyContinue
+# Remove pip-installed packages from backend/ (keep only project source files)
+$keepFiles = @("admin.py","app.py","auth.py","ec2_ops.py","notifications.py","scheduler.py","utils.py","validators.py","requirements.txt","ruff.toml")
+Get-ChildItem "backend" | Where-Object { $keepFiles -notcontains $_.Name } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
