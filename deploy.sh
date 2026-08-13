@@ -58,6 +58,7 @@ echo "[1/6] Checking deploy bucket..."
 if ! aws s3api head-bucket --bucket "${S3_BUCKET}" 2>/dev/null; then
     echo "  Creating bucket: ${S3_BUCKET}"
     aws s3api create-bucket --bucket "${S3_BUCKET}" --region "${REGION}" > /dev/null
+    aws s3api put-bucket-tagging --bucket "${S3_BUCKET}" --tagging 'TagSet=[{Key=Project,Value=cloud-control-panel},{Key=Environment,Value='"${ENV}"'},{Key=Owner,Value=platform-team},{Key=CostCenter,Value=cloud-ops},{Key=ManagedBy,Value=deploy-script},{Key=Component,Value=deployment}]' > /dev/null
 fi
 echo "  OK"
 
@@ -88,6 +89,7 @@ if ! aws cloudformation deploy \
     --region "${REGION}" \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameter-overrides "StackTag=${STACK_TAG}" \
+    --tags "Project=cloud-control-panel" "Environment=${ENV}" "Owner=platform-team" "CostCenter=cloud-ops" "ManagedBy=cloudformation" \
     --no-fail-on-empty-changeset; then
     echo "  Deploy failed!"
     echo "  Check: aws cloudformation describe-stack-events --stack-name ${STACK_NAME} --region ${REGION}"

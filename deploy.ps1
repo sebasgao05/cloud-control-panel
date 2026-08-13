@@ -25,6 +25,7 @@ $bucketExists = aws s3api head-bucket --bucket $S3Bucket 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  Creating bucket: $S3Bucket"
     aws s3api create-bucket --bucket $S3Bucket --region $Region | Out-Null
+    aws s3api put-bucket-tagging --bucket $S3Bucket --tagging 'TagSet=[{Key=Project,Value=cloud-control-panel},{Key=Environment,Value=production},{Key=Owner,Value=platform-team},{Key=CostCenter,Value=cloud-ops},{Key=ManagedBy,Value=deploy-script},{Key=Component,Value=deployment}]' | Out-Null
 }
 Write-Host "  OK" -ForegroundColor Green
 
@@ -54,6 +55,7 @@ aws cloudformation deploy `
     --region $Region `
     --capabilities CAPABILITY_NAMED_IAM `
     --parameter-overrides "StackTag=$StackTag" `
+    --tags "Project=cloud-control-panel" "Environment=production" "Owner=platform-team" "CostCenter=cloud-ops" "ManagedBy=cloudformation" `
     --no-fail-on-empty-changeset
 
 if ($LASTEXITCODE -ne 0) {
