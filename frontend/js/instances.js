@@ -27,32 +27,27 @@ export async function refreshInstances() {
 }
 
 async function checkSettingsVisibility() {
-    // Show settings button if scheduler or notifications or costs are available, or user is admin
+    // Show settings button if scheduler or notifications or costs are available, or user is admin/superadmin
     const btn = document.getElementById("btn-settings-panel");
+
+    // Superadmin and admin ALWAYS see the settings button (they manage keys at minimum)
+    if (state.userRole === "superadmin" || state.userRole === "admin") {
+        btn.classList.remove("hidden");
+        return;
+    }
+
+    // For operators, check if any feature is accessible
     try {
         const schedData = await api("GET", `/accounts/${state.currentAccountId}/schedule`);
-        const notifData = await api("GET", `/accounts/${state.currentAccountId}/notifications`);
-        const costsData = await api("GET", `/accounts/${state.currentAccountId}/costs`);
         const hasScheduler = schedData.enabled && schedData.permissions?.view;
-        const hasNotifs = notifData.enabled && notifData.canEdit;
-        const hasCosts = costsData.enabled;
-        // Always show for admin (they can manage keys)
-        if (hasScheduler || hasNotifs || hasCosts) {
+        if (hasScheduler) {
             btn.classList.remove("hidden");
-        } else {
-            // Try to load keys to check if admin
-            try {
-                const keysData = await api("GET", `/keys/list`);
-                if (keysData.keys) {
-                    btn.classList.remove("hidden");
-                    return;
-                }
-            } catch (e) {}
-            btn.classList.add("hidden");
+            return;
         }
-    } catch (e) {
-        btn.classList.add("hidden");
-    }
+    } catch (e) {}
+
+    btn.classList.add("hidden");
+}
 }
 
 export function renderGroups(groups) {
