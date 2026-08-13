@@ -1884,3 +1884,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Form Hints ──────────────────────────────────────────────────────── */
+
+.form-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.3;
+}

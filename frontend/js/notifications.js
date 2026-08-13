@@ -126,6 +126,7 @@ export function editChannel(channelId) {
         document.getElementById("notif-smtp-host").value = config.smtpHost || "";
         document.getElementById("notif-smtp-port").value = config.smtpPort || "";
         document.getElementById("notif-smtp-user").value = config.smtpUser || "";
+        document.getElementById("notif-smtp-pass").value = config.smtpPass || "";
     } else if (ch.type === "telegram") {
         document.getElementById("notif-tg-token").value = config.botToken || "";
         document.getElementById("notif-tg-chatid").value = config.chatId || "";
@@ -143,6 +144,7 @@ function clearChannelFields() {
     document.getElementById("notif-smtp-host").value = "";
     document.getElementById("notif-smtp-port").value = "";
     document.getElementById("notif-smtp-user").value = "";
+    document.getElementById("notif-smtp-pass").value = "";
     document.getElementById("notif-tg-token").value = "";
     document.getElementById("notif-tg-chatid").value = "";
     document.getElementById("notif-teams-url").value = "";
@@ -162,7 +164,7 @@ export async function saveChannel() {
     if (type === "email") {
         const to = document.getElementById("notif-email-to").value.trim();
         if (!to) { showToast("Ingresa el email"); return; }
-        config = { to, smtpHost: document.getElementById("notif-smtp-host").value.trim(), smtpPort: parseInt(document.getElementById("notif-smtp-port").value) || 587, smtpUser: document.getElementById("notif-smtp-user").value.trim() };
+        config = { to, smtpHost: document.getElementById("notif-smtp-host").value.trim(), smtpPort: parseInt(document.getElementById("notif-smtp-port").value) || 587, smtpUser: document.getElementById("notif-smtp-user").value.trim(), smtpPass: document.getElementById("notif-smtp-pass").value.trim() };
     } else if (type === "telegram") {
         const chatId = document.getElementById("notif-tg-chatid").value.trim();
         if (!chatId) { showToast("Ingresa el Chat ID"); return; }
