@@ -341,6 +341,8 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
             "ruleId": rule_id,
         }
 
+    tags = get_resource_tags()
+
     start_cron = cron_to_eventbridge(rule.get("startCron", ""), tz)
     if start_cron:
         start_payload = {**event_payload_base, "action": "start"}
