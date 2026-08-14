@@ -133,7 +133,7 @@ jobs:
       - name: Approval granted
         run: echo "Production deployment approved. Proceeding to deploy."
 
-  # ─── Production: deploy to production after manual approval ───────────
+  # ─── Production: delete staging, deploy production after approval ─────
 
   deploy:
     name: Deploy Production
@@ -155,6 +155,20 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+
+      - name: Delete staging stack
+        run: |
+          echo "🗑️ Deleting staging stack cloud-control-ccp-staging..."
+          aws cloudformation delete-stack \
+            --stack-name "cloud-control-ccp-staging" \
+            --region us-east-1
+
+          echo "⏳ Waiting for staging stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "cloud-control-ccp-staging" \
+            --region us-east-1 || true
+
+          echo "✅ Staging stack deleted successfully"
 
       - name: Deploy to production
         id: prod-deploy
