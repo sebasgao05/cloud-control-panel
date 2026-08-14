@@ -28,7 +28,6 @@ def get_uptime_data(account_id: str, resource_id: str, days: int) -> dict:
 
     # Truncate to the start of the hour
     start_hour = start_time.replace(minute=0, second=0, microsecond=0)
-    end_hour = now.replace(minute=0, second=0, microsecond=0)
 
     # Build the list of hourly intervals
     total_intervals = days * 24

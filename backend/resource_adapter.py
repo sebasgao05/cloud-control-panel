@@ -9,6 +9,10 @@ for operating on resources in external AWS accounts.
 from abc import ABC, abstractmethod
 from typing import Literal
 
+
+class CrossAccountAccessError(Exception):
+    """Raised when cross-account STS AssumeRole fails."""
+
 import boto3
 from botocore.exceptions import ClientError
 
@@ -98,7 +102,7 @@ class ResourceAdapter(ABC):
                 f"[CROSS-ACCOUNT] AssumeRole failed for account {account_id}: "
                 f"{error_code} - {error_message}"
             )
-            raise Exception(
+            raise CrossAccountAccessError(
                 f"Cross-account access failed for account {account_id}: {error_code}"
             ) from e
 

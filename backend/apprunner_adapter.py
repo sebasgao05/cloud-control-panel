@@ -195,7 +195,7 @@ class AppRunnerAdapter(ResourceAdapter):
             service = resp["Service"]
 
             # Check the latest operation to determine direction
-            latest_operation = service.get("ServiceObservabilityConfiguration") or {}
+            _ = service.get("ServiceObservabilityConfiguration") or {}
             # The LatestOperationId or AutoDeploymentsEnabled won't help directly,
             # but we can inspect the service's operational context via
             # the OperationId or Status metadata.
