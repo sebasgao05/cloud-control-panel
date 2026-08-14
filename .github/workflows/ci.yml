@@ -56,14 +56,16 @@ jobs:
       - name: Run tests with coverage
         run: pytest tests/ -v --cov=backend --cov-report=term-missing
 
-  # ─── Staging: deploy efímero en PRs para validar infraestructura ─────
+  # ─── Persistent Staging: deploy ccp-staging on every merge to main ───
 
-  staging-deploy:
-    name: Deploy Staging
+  deploy-staging:
+    name: Deploy Staging (ccp-staging)
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: staging
+    outputs:
+      panel-url: ${{ steps.deploy.outputs.panel-url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,105 +81,64 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Deploy staging stack
+      - name: Deploy persistent staging stack
         id: deploy
         run: |
-          STACK_TAG="ccp-staging-pr${{ github.event.pull_request.number }}"
-          STACK_NAME="cloud-control-${STACK_TAG}"
-          echo "stack-name=${STACK_NAME}" >> "$GITHUB_OUTPUT"
-          echo "stack-tag=${STACK_TAG}" >> "$GITHUB_OUTPUT"
-
           # Reconstruct accounts.json from secret
           echo '${{ secrets.ACCOUNTS_JSON }}' > config/accounts.json
 
-          # Deploy
+          # Deploy persistent staging stack
           chmod +x deploy.sh
-          ./deploy.sh --stack-tag "${STACK_TAG}" --env staging
+          ./deploy.sh --stack-tag ccp-staging --env staging
 
           # Get panel URL
           PANEL_URL=$(aws cloudformation describe-stacks \
-            --stack-name "${STACK_NAME}" \
+            --stack-name "cloud-control-ccp-staging" \
             --query "Stacks[0].Outputs[?OutputKey=='ControlPanelUrl'].OutputValue" \
             --output text)
           echo "panel-url=${PANEL_URL}" >> "$GITHUB_OUTPUT"
 
-      - name: Comment PR with staging URL
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const url = '${{ steps.deploy.outputs.panel-url }}';
-            const stack = '${{ steps.deploy.outputs.stack-name }}';
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `## 🚀 Staging deployed\n\n**URL:** ${url}\n**Stack:** \`${stack}\`\n\n### Pruebas requeridas\nValida el ambiente y luego aprueba el environment **"staging-approve"** para destruirlo y habilitar merge a producción.\n\n**API Keys de prueba** (accounts.example.json):\n| Key | Rol |\n|-----|-----|\n| \`CHANGE_ME_superadmin_key\` | Superadmin |\n| \`CHANGE_ME_admin_key\` | Admin |\n| \`CHANGE_ME_operator_key\` | Operador |`
-            });
-
-  # ─── Gate: requiere aprobación manual después de probar staging ──────
-
-  staging-approve:
-    name: Approve Staging
-    runs-on: ubuntu-latest
-    needs: staging-deploy
-    if: github.event_name == 'pull_request'
-    environment: staging-approve
-    steps:
-      - name: Staging approved
-        run: echo "✅ Staging probado y aprobado. Procediendo a destruir el ambiente."
-
-  # ─── Destroy staging después de aprobación ───────────────────────────
-
-  staging-destroy:
-    name: Destroy Staging
-    runs-on: ubuntu-latest
-    needs: staging-approve
-    if: github.event_name == 'pull_request'
-    environment: staging
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Destroy staging stack
+      - name: Run health check on staging
         run: |
-          STACK_TAG="ccp-staging-pr${{ github.event.pull_request.number }}"
-          STACK_NAME="cloud-control-${STACK_TAG}"
-          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          BUCKET_NAME="cloud-control-${STACK_TAG}-${ACCOUNT_ID}"
+          chmod +x scripts/health-check.sh
+          ./scripts/health-check.sh \
+            "${{ steps.deploy.outputs.panel-url }}" \
+            "cloud-control-ccp-staging" \
+            --region us-east-1 \
+            --sns-topic "${{ secrets.SNS_NOTIFICATION_TOPIC }}"
 
-          echo "🗑️ Destroying staging: ${STACK_NAME}"
+      - name: Upload staging panel URL as artifact
+        run: |
+          mkdir -p staging-output
+          echo "${{ steps.deploy.outputs.panel-url }}" > staging-output/panel-url.txt
+          echo "Staging Panel URL: ${{ steps.deploy.outputs.panel-url }}"
 
-          # Empty S3 bucket (required before stack deletion)
-          aws s3 rm "s3://${BUCKET_NAME}" --recursive 2>/dev/null || true
-
-          # Delete CloudFormation stack
-          aws cloudformation delete-stack --stack-name "${STACK_NAME}"
-          echo "Waiting for stack deletion..."
-          aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}" || true
-
-          echo "✅ Staging destroyed."
-
-      - name: Comment PR - staging destroyed
-        uses: actions/github-script@v7
+      - name: Upload staging URL artifact
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: ${{ github.event.pull_request.number }},
-              body: `## 🗑️ Staging destroyed\n\nEl ambiente de staging fue eliminado después de la aprobación.\n\n✅ El PR está listo para merge a producción.`
-            });
+          name: staging-panel-url
+          path: staging-output/panel-url.txt
+          retention-days: 90
 
-  # ─── Production: deploy solo en push a main ──────────────────────────
+  # ─── Manual Approval Gate: 72-hour expiry, environment-approver required ─
+
+  approve-production:
+    name: Approve Production Deployment
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production-approval
+    steps:
+      - name: Approval granted
+        run: echo "Production deployment approved. Proceeding to deploy."
+
+  # ─── Production: deploy to production after manual approval ───────────
 
   deploy:
     name: Deploy Production
     runs-on: ubuntu-latest
-    needs: test
+    needs: approve-production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
     steps:
@@ -196,9 +157,26 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy to production
+        id: prod-deploy
         run: |
           # Reconstruct accounts.json from secret
           echo '${{ secrets.ACCOUNTS_JSON }}' > config/accounts.json
 
           chmod +x deploy.sh
           ./deploy.sh --stack-tag ccp-main --env prod
+
+          # Get production panel URL
+          PANEL_URL=$(aws cloudformation describe-stacks \
+            --stack-name "cloud-control-ccp-main" \
+            --query "Stacks[0].Outputs[?OutputKey=='ControlPanelUrl'].OutputValue" \
+            --output text)
+          echo "panel-url=${PANEL_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Run health check on production
+        run: |
+          chmod +x scripts/health-check.sh
+          ./scripts/health-check.sh \
+            "${{ steps.prod-deploy.outputs.panel-url }}" \
+            "cloud-control-ccp-main" \
+            --region us-east-1 \
+            --sns-topic "${{ secrets.SNS_NOTIFICATION_TOPIC }}"

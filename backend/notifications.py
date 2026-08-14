@@ -70,14 +70,23 @@ def handle_test_notification(account, user_info, body):
     return response(200, {"error": f"Error enviando a {channel.get('name')}"})
 
 
-def send_notifications(account, event, instance_name, user_info=None):
-    """Send notifications to all enabled channels for an event."""
+def send_notifications(account, event, instance_name, user_info=None, resource_type=None):
+    """Send notifications to all enabled channels for an event.
+
+    Args:
+        account: Account dict with features and notification channels.
+        event: Event type (started, stopped, error, scheduler_executed).
+        instance_name: Human-readable name of the resource.
+        user_info: Optional dict with user name and role.
+        resource_type: Resource type (ec2, rds, ecs, lightsail, apprunner). Defaults to "ec2".
+    """
     features = account.get("features", {})
     if not features.get("notifications", False):
         return
     user_name = user_info.get("name", "Sistema") if user_info else "Sistema"
     user_role = user_info.get("role", "unknown") if user_info else "scheduler"
     account_name = account.get("name", account.get("id", ""))
+    resolved_type = resource_type if resource_type else "ec2"
 
     event_labels = {"started": "ENCENDIDO", "stopped": "APAGADO", "error": "ERROR", "scheduler_executed": "SCHEDULER"}
     event_label = event_labels.get(event, event.upper())
@@ -86,7 +95,8 @@ def send_notifications(account, event, instance_name, user_info=None):
     body = (
         f"\U0001f514 {event_label}\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"Recurso: {instance_name}\n"
+        f"resource_type: {resolved_type}\n"
+        f"resource_name: {instance_name}\n"
         f"Cuenta: {account_name}\n"
         f"Ejecutado por: {user_name} ({user_role})\n"
         f"Fecha: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"

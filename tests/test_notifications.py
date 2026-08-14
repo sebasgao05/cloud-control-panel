@@ -91,6 +91,102 @@ class TestSendNotifications:
         assert mock_send.call_count == 2
 
 
+class TestNotificationResourceFields:
+    """Test that notifications include resource_type and resource_name as distinct fields."""
+
+    @patch("notifications.send_single_notification")
+    def test_notification_body_contains_resource_type_and_name(self, mock_send):
+        from notifications import send_notifications
+
+        account = {
+            "id": "acc-1",
+            "name": "Account 1",
+            "features": {"notifications": True},
+            "notifications": {
+                "channels": [
+                    {"id": "ch-1", "type": "email", "name": "Admin", "enabled": True, "events": ["started"]},
+                ]
+            },
+        }
+        send_notifications(account, "started", "My RDS Cluster", {"name": "User", "role": "admin"}, resource_type="rds")
+        mock_send.assert_called_once()
+        # send_single_notification(channel, event, message, subject)
+        call_args = mock_send.call_args[0]
+        body = call_args[2]  # message body is the third positional arg
+        assert "resource_type: rds" in body
+        assert "resource_name: My RDS Cluster" in body
+
+    @patch("notifications.send_single_notification")
+    def test_notification_all_resource_types(self, mock_send):
+        from notifications import send_notifications
+
+        account = {
+            "id": "acc-1",
+            "name": "Account 1",
+            "features": {"notifications": True},
+            "notifications": {
+                "channels": [
+                    {"id": "ch-1", "type": "email", "name": "Admin", "enabled": True, "events": ["started"]},
+                ]
+            },
+        }
+        resource_types = ["ec2", "rds", "ecs", "lightsail", "apprunner"]
+        for rtype in resource_types:
+            mock_send.reset_mock()
+            send_notifications(account, "started", f"Resource-{rtype}", {"name": "User", "role": "admin"}, resource_type=rtype)
+            mock_send.assert_called_once()
+            call_args = mock_send.call_args[0]
+            body = call_args[2]  # message body is the third positional arg
+            assert f"resource_type: {rtype}" in body, f"resource_type field missing for {rtype}"
+            assert f"resource_name: Resource-{rtype}" in body, f"resource_name field missing for {rtype}"
+
+    @patch("notifications.send_single_notification")
+    def test_notification_defaults_to_ec2_when_no_type(self, mock_send):
+        from notifications import send_notifications
+
+        account = {
+            "id": "acc-1",
+            "name": "Account 1",
+            "features": {"notifications": True},
+            "notifications": {
+                "channels": [
+                    {"id": "ch-1", "type": "email", "name": "Admin", "enabled": True, "events": ["started"]},
+                ]
+            },
+        }
+        send_notifications(account, "started", "Legacy Instance", {"name": "User", "role": "admin"})
+        call_args = mock_send.call_args[0]
+        body = call_args[2]  # message body is the third positional arg
+        assert "resource_type: ec2" in body
+        assert "resource_name: Legacy Instance" in body
+
+    @patch("notifications.send_single_notification")
+    def test_resource_fields_are_distinct_lines(self, mock_send):
+        from notifications import send_notifications
+
+        account = {
+            "id": "acc-1",
+            "name": "Account 1",
+            "features": {"notifications": True},
+            "notifications": {
+                "channels": [
+                    {"id": "ch-1", "type": "email", "name": "Admin", "enabled": True, "events": ["stopped"]},
+                ]
+            },
+        }
+        send_notifications(account, "stopped", "My ECS Service", {"name": "User", "role": "admin"}, resource_type="ecs")
+        call_args = mock_send.call_args[0]
+        body = call_args[2]  # message body is the third positional arg
+        lines = body.split("\n")
+        # resource_type and resource_name should be on separate lines for programmatic extraction
+        type_lines = [l for l in lines if l.startswith("resource_type:")]
+        name_lines = [l for l in lines if l.startswith("resource_name:")]
+        assert len(type_lines) == 1
+        assert len(name_lines) == 1
+        assert type_lines[0] == "resource_type: ecs"
+        assert name_lines[0] == "resource_name: My ECS Service"
+
+
 class TestHandleGetNotifications:
     """Test handle_get_notifications."""
 

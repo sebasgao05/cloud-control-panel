@@ -4,7 +4,7 @@
 
 import { state, api, showToast, escapeHtml } from './utils.js';
 import { showScreen } from './navigation.js';
-import { refreshInstances } from './instances.js';
+import { refreshInstances, renderTypeBadge } from './instances.js';
 import { renderOperatorAssignment, updateOperatorAccess } from './admin.js';
 
 export function openGroup(groupId) {
@@ -37,6 +37,7 @@ export function renderGroupInstances(group) {
                 <span class="indicator ${stateClass}"></span>
                 <div class="instance-text">
                     <span class="instance-name">${escapeHtml(inst.name)}</span>
+                    ${renderTypeBadge(inst.type)}
                     <span class="instance-meta">${inst.instanceId}${inst.publicIp ? ' · ' + inst.publicIp : ''}</span>
                 </div>
             </div>

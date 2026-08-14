@@ -1,5 +1,6 @@
 pytest>=7.0
 pytest-cov
+hypothesis>=6.0
 moto[dynamodb]>=5.0
 requests
 ruff

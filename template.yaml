@@ -94,6 +94,43 @@ Resources:
                   - ec2:StopInstances
                   - ec2:DescribeInstances
                 Resource: "*"
+              # RDS operations
+              - Effect: Allow
+                Action:
+                  - rds:StartDBCluster
+                  - rds:StopDBCluster
+                  - rds:StartDBInstance
+                  - rds:StopDBInstance
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBInstances
+                Resource: "*"
+              # ECS operations
+              - Effect: Allow
+                Action:
+                  - ecs:UpdateService
+                  - ecs:DescribeServices
+                  - ecs:DescribeClusters
+                Resource: "*"
+              # Lightsail operations
+              - Effect: Allow
+                Action:
+                  - lightsail:StartInstance
+                  - lightsail:StopInstance
+                  - lightsail:GetInstance
+                Resource: "*"
+              # AppRunner operations
+              - Effect: Allow
+                Action:
+                  - apprunner:PauseService
+                  - apprunner:ResumeService
+                  - apprunner:DescribeService
+                Resource: "*"
+              # CloudWatch metrics
+              - Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
+                Resource: "*"
               # SSM for updates
               - Effect: Allow
                 Action:

@@ -4,6 +4,8 @@
 
 import { state } from './utils.js';
 import { closeSettingsPanel } from './settings.js';
+import { destroyMetricsCharts } from './metrics-chart.js';
+import { destroyUptimeChart } from './uptime-chart.js';
 
 export function showScreen(screenId) {
     document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
@@ -25,6 +27,8 @@ export function goBackToAccounts() {
 export function goBackToInstances() {
     state.currentInstanceId = null;
     if (state.statusInterval) clearInterval(state.statusInterval);
+    destroyUptimeChart();
+    destroyMetricsCharts();
     if (state.cameFromGroup && state.currentGroupId) {
         showScreen("group-screen");
         // Dynamic import to avoid circular dependency

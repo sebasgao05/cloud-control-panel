@@ -28,18 +28,44 @@ def get_resource_tags():
     ]
 
 
-def log_activity(account_id, action, user_name, instance_ids, rule_id=None):
-    """Log an activity event to DynamoDB."""
-    ts = datetime.now(timezone.utc).isoformat()
+def log_activity(account_id, action, user_name, instance_ids, rule_id=None, resource_type=None, resource_name=None):
+    """Log an activity event to DynamoDB.
+
+    Includes resource_type, resource_name, and ISO 8601 UTC timestamp.
+    Implements retry-once logic: if the DynamoDB write fails, retries once.
+    If still unsuccessful, logs to system error without blocking the caller.
+
+    Args:
+        account_id: The account identifier.
+        action: The action performed (e.g. "start", "stop").
+        user_name: The user or system that performed the action.
+        instance_ids: List of resource IDs affected.
+        rule_id: Optional scheduler rule ID that triggered the action.
+        resource_type: Resource type (one of: ec2, rds, ecs, lightsail, apprunner).
+        resource_name: Human-readable resource name.
+    """
+    now = datetime.now(timezone.utc)
+    ts = now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
     entry = {
         "action": action,
         "user": user_name,
-        "instanceIds": instance_ids,
+        "resourceIds": instance_ids,
+        "resourceType": resource_type,
+        "resourceName": resource_name,
         "timestamp": ts,
+        "ruleId": rule_id,
     }
-    if rule_id:
-        entry["ruleId"] = rule_id
-    db_put({"PK": f"ACTIVITY#{account_id}", "SK": ts, "data": entry})
+
+    item = {"PK": f"ACTIVITY#{account_id}", "SK": ts, "data": entry}
+
+    try:
+        db_put(item)
+    except Exception as e:
+        logger.warning(f"[ACTIVITY LOG] First write attempt failed: {e}. Retrying...")
+        try:
+            db_put(item)
+        except Exception as retry_err:
+            logger.error(f"[ACTIVITY LOG] Retry failed, activity not recorded: {retry_err}")
 
 
 def handle_get_activity(account_id):
@@ -106,13 +132,24 @@ def handle_update_schedule(account, account_id, user_info, body):
 
 
 def handle_scheduler_event(event):
-    """Handle scheduled start/stop invoked by EventBridge Scheduler."""
+    """Handle scheduled start/stop invoked by EventBridge Scheduler.
+
+    Supports two event formats:
+    1. Legacy EC2-only: {"action", "accountId", "instanceIds", "ruleId"}
+    2. Multi-service: {"action", "accountId", "resourceIds", "ruleId"}
+       where resourceIds are config-level resource IDs (not AWS resource IDs).
+
+    For multi-service events, dispatches to the appropriate adapter via get_adapter().
+    For legacy events (instanceIds only), falls back to direct EC2 operations.
+    """
     action = event.get("action")
     account_id = event.get("accountId")
+    resource_ids = event.get("resourceIds", [])
     instance_ids = event.get("instanceIds", [])
     rule_id = event.get("ruleId", "unknown")
 
-    if not action or not account_id or not instance_ids:
+    # Validate: must have action, accountId, and at least one of resourceIds or instanceIds
+    if not action or not account_id or (not resource_ids and not instance_ids):
         logger.error(f"[SCHEDULER EVENT] Invalid payload: {json.dumps(event)}")
         return {"statusCode": 400, "body": "Invalid scheduler event"}
 
@@ -122,6 +159,89 @@ def handle_scheduler_event(event):
         logger.error(f"[SCHEDULER EVENT] Account {account_id} not found")
         return {"statusCode": 404, "body": "Account not found"}
 
+    # Multi-service path: dispatch via resource adapters
+    if resource_ids:
+        return _handle_scheduler_resource_event(account, account_id, action, resource_ids, rule_id)
+
+    # Legacy EC2-only path (backward compatibility)
+    return _handle_scheduler_ec2_event(account, account_id, action, instance_ids, rule_id)
+
+
+def _handle_scheduler_resource_event(account, account_id, action, resource_ids, rule_id):
+    """Handle scheduled event for multi-service resources via adapters.
+
+    Looks up each resource by its config ID, determines its type, and invokes
+    the appropriate adapter (EC2, RDS, ECS, Lightsail, or AppRunner).
+    """
+    from resource_adapter import get_adapter
+
+    if action not in ("start", "stop"):
+        return {"statusCode": 400, "body": f"Unknown action: {action}"}
+
+    all_resources = account.get("resources", [])
+    results = []
+    errors = []
+
+    for res_id in resource_ids:
+        if not res_id:
+            continue
+
+        resource = next((r for r in all_resources if r.get("id") == res_id), None)
+        if not resource:
+            logger.warning(f"[SCHEDULER EVENT] Resource {res_id} not found in account {account_id}")
+            errors.append(f"Resource {res_id} not found")
+            continue
+
+        resource_type = resource.get("type", "ec2")
+        resource_name = resource.get("name", res_id)
+
+        try:
+            adapter = get_adapter(account, resource)
+            if action == "start":
+                adapter.start()
+            else:
+                adapter.stop()
+
+            results.append(res_id)
+            logger.info(
+                f"[SCHEDULER EVENT] {action.upper()} resource={res_id} "
+                f"type={resource_type} account={account_id} rule={rule_id}"
+            )
+            log_activity(
+                account_id, action, "Scheduler", [res_id],
+                rule_id=rule_id, resource_type=resource_type, resource_name=resource_name,
+            )
+
+        except Exception as e:
+            logger.error(f"[SCHEDULER EVENT] Error {action} resource {res_id} (type={resource_type}): {e}")
+            errors.append(f"{resource_type}:{res_id} - {e!s}")
+            send_notifications(
+                account, "error",
+                f"Scheduler error ({action}) {resource_type} '{resource_name}': {e!s}",
+            )
+
+    # Send success notification for completed resources
+    if results:
+        action_label = "encendio" if action == "start" else "apago"
+        msg = f"Scheduler {action_label}: {', '.join(results)}"
+        scheduler_user = {"name": "Scheduler Automatico", "role": "scheduler"}
+        send_notifications(account, "scheduler_executed", msg, scheduler_user)
+
+    if errors and not results:
+        return {"statusCode": 500, "body": f"All operations failed: {'; '.join(errors)}"}
+
+    return {
+        "statusCode": 200,
+        "body": f"{action} executed for {len(results)} resources"
+        + (f" ({len(errors)} errors)" if errors else ""),
+    }
+
+
+def _handle_scheduler_ec2_event(account, account_id, action, instance_ids, rule_id):
+    """Handle scheduled event for EC2 instances (legacy path).
+
+    Maintains backward compatibility with events that only contain instanceIds.
+    """
     from ec2_ops import get_ec2_client
 
     ec2 = get_ec2_client(account)
@@ -141,7 +261,7 @@ def handle_scheduler_event(event):
             return {"statusCode": 400, "body": f"Unknown action: {action}"}
 
         logger.info(f"[SCHEDULER EVENT] {action.upper()} instances={valid_ids} account={account_id} rule={rule_id}")
-        log_activity(account_id, action, "Scheduler", valid_ids, rule_id)
+        log_activity(account_id, action, "Scheduler", valid_ids, rule_id, resource_type="ec2")
         scheduler_user = {"name": "Scheduler Automatico", "role": "scheduler"}
         send_notifications(account, "scheduler_executed", msg, scheduler_user)
 
@@ -175,7 +295,13 @@ def cron_to_eventbridge(cron_expr, tz):
 
 
 def create_eventbridge_schedule(account_id, account, rule, tz):
-    """Create start and stop EventBridge schedules for a rule."""
+    """Create start and stop EventBridge schedules for a rule.
+
+    Supports both legacy EC2 instances and multi-service resources. If the rule
+    contains 'resources' (resource config IDs), the event payload uses 'resourceIds'
+    to trigger the multi-service adapter path. Otherwise falls back to 'instanceIds'
+    for EC2-only backward compatibility.
+    """
     scheduler = boto3.client("scheduler", region_name=REGION)
     lambda_arn = os.environ.get("LAMBDA_ARN", "")
     role_arn = os.environ.get("SCHEDULER_ROLE_ARN", "")
@@ -185,20 +311,39 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
         logger.warning("[SCHEDULER] Missing LAMBDA_ARN or SCHEDULER_ROLE_ARN")
         return
 
-    instances = rule.get("instances", [])
     rule_id = rule["id"]
-
-    instance_ec2_ids = []
-    for inst_config_id in instances:
-        for inst in account.get("instances", []):
-            if inst["id"] == inst_config_id:
-                instance_ec2_ids.append(inst.get("instanceId", ""))
-                break
-
     tags = get_resource_tags()
+
+    # Determine if this rule targets multi-service resources or legacy EC2 instances
+    resource_config_ids = rule.get("resources", [])
+    instances = rule.get("instances", [])
+
+    if resource_config_ids:
+        # Multi-service path: pass resource config IDs directly
+        event_payload_base = {
+            "source": "scheduler",
+            "accountId": account_id,
+            "resourceIds": resource_config_ids,
+            "ruleId": rule_id,
+        }
+    else:
+        # Legacy EC2 path: resolve instance config IDs to EC2 instance IDs
+        instance_ec2_ids = []
+        for inst_config_id in instances:
+            for inst in account.get("instances", []):
+                if inst["id"] == inst_config_id:
+                    instance_ec2_ids.append(inst.get("instanceId", ""))
+                    break
+        event_payload_base = {
+            "source": "scheduler",
+            "accountId": account_id,
+            "instanceIds": instance_ec2_ids,
+            "ruleId": rule_id,
+        }
 
     start_cron = cron_to_eventbridge(rule.get("startCron", ""), tz)
     if start_cron:
+        start_payload = {**event_payload_base, "action": "start"}
         schedule_params = {
             "Name": f"{stack_tag}-{account_id}-{rule_id}-start",
             "GroupName": "default",
@@ -208,15 +353,7 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
             "Target": {
                 "Arn": lambda_arn,
                 "RoleArn": role_arn,
-                "Input": json.dumps(
-                    {
-                        "source": "scheduler",
-                        "action": "start",
-                        "accountId": account_id,
-                        "instanceIds": instance_ec2_ids,
-                        "ruleId": rule_id,
-                    }
-                ),
+                "Input": json.dumps(start_payload),
             },
             "State": "ENABLED",
         }
@@ -228,6 +365,7 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
 
     stop_cron = cron_to_eventbridge(rule.get("stopCron", ""), tz)
     if stop_cron:
+        stop_payload = {**event_payload_base, "action": "stop"}
         schedule_params = {
             "Name": f"{stack_tag}-{account_id}-{rule_id}-stop",
             "GroupName": "default",
@@ -237,15 +375,7 @@ def create_eventbridge_schedule(account_id, account, rule, tz):
             "Target": {
                 "Arn": lambda_arn,
                 "RoleArn": role_arn,
-                "Input": json.dumps(
-                    {
-                        "source": "scheduler",
-                        "action": "stop",
-                        "accountId": account_id,
-                        "instanceIds": instance_ec2_ids,
-                        "ruleId": rule_id,
-                    }
-                ),
+                "Input": json.dumps(stop_payload),
             },
             "State": "ENABLED",
         }

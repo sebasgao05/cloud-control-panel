@@ -18,7 +18,7 @@ from admin import (
     handle_list_keys,
     handle_update_key_accounts,
 )
-from auth import authenticate, find_group, find_instance, get_allowed_accounts, is_admin, is_superadmin
+from auth import authenticate, find_group, find_instance, find_resource, get_allowed_accounts, is_admin, is_superadmin
 from ec2_ops import (
     handle_dashboard_url,
     handle_group_start,
@@ -41,6 +41,8 @@ from scheduler import (
 )
 from utils import (
     CONFIG_PATH,
+    db_delete,
+    db_put,
     is_db_initialized,
     load_config_from_db,
     logger,
@@ -49,7 +51,82 @@ from utils import (
     response,
 )
 from validators import ImportConfigRequest, format_validation_errors, validate_path_parameter
+from validators import CreateResourceRequest, check_duplicate_resource_id
+from resource_adapter import get_adapter
+from uptime import get_uptime_data
+from metrics import handle_get_metrics
 
+
+def _handle_resource_action(account: dict, resource: dict, action: str) -> dict:
+    """Handle resource start/stop/status via the adapter factory.
+
+    Routes to the correct service adapter based on resource type and executes
+    the requested action. Handles all adapter errors with appropriate HTTP codes.
+
+    Args:
+        account: Account configuration dict.
+        resource: Resource configuration dict with a 'type' field.
+        action: One of "start", "stop", or "status".
+
+    Returns:
+        API Gateway response dict.
+    """
+    try:
+        adapter = get_adapter(account, resource)
+    except ValueError as e:
+        return response(400, {"error": str(e)})
+
+    try:
+        if action == "status":
+            result = adapter.status()
+        elif action == "start":
+            result = adapter.start()
+        elif action == "stop":
+            result = adapter.stop()
+        else:
+            return response(400, {"error": f"Unknown action: {action}"})
+        return response(200, result)
+    except PermissionError as e:
+        return response(403, {"error": str(e)})
+    except RuntimeError as e:
+        return response(401, {"error": str(e)})
+    except ValueError as e:
+        return response(400, {"error": str(e)})
+    except Exception as e:
+        logger.error(f"[RESOURCE] Action '{action}' failed for resource {resource.get('id')}: {e!s}", exc_info=True)
+        return response(500, {"error": f"Resource operation failed: {type(e).__name__}"})
+
+
+def _handle_resource_metrics(account: dict, resource: dict) -> dict:
+    """Handle GET /api/accounts/{id}/resources/{rid}/metrics.
+
+    Fetches the resource's current state via its adapter, then queries
+    CloudWatch for CPU and memory metrics. Returns empty metrics if the
+    resource is not running, and a 503 on timeout/failure.
+
+    Args:
+        account: Account configuration dict.
+        resource: Resource configuration dict.
+
+    Returns:
+        API Gateway response dict.
+    """
+    # Get the current resource state from the adapter
+    try:
+        adapter = get_adapter(account, resource)
+        status_result = adapter.status()
+        resource_with_state = {**resource, "state": status_result.get("state", "unknown")}
+    except Exception as e:
+        logger.error(f"[METRICS] Failed to get resource state for {resource.get('id')}: {e!s}")
+        return response(503, {"error": "Metrics temporarily unavailable"})
+
+    result = handle_get_metrics(account, resource_with_state)
+
+    # If metrics handler returned an error, respond with 503
+    if "error" in result:
+        return response(503, {"error": result["error"]})
+
+    return response(200, result)
 
 def lambda_handler(event, context):
     """Main Lambda entry point - routes requests to handler modules."""
@@ -149,6 +226,53 @@ def lambda_handler(event, context):
                         return handle_instance_update(account, instance, user_info)
                     if method == "GET" and action == "dashboard-url":
                         return handle_dashboard_url(account, instance)
+            # --- Multi-service resource routes ---
+            if len(parts) == 4 and parts[3] == "resources" and method == "GET":
+                resources = account.get("resources", [])
+                return response(200, {"resources": resources})
+            if len(parts) == 4 and parts[3] == "resources" and method == "POST":
+                if not is_superadmin(user_info):
+                    return response(403, {"error": "Solo superadmin puede crear recursos"})
+                body = json.loads(event.get("body", "{}") or "{}")
+                try:
+                    validated = CreateResourceRequest.model_validate(body)
+                except ValidationError as e:
+                    return response(400, {"error": "Validation error", "details": format_validation_errors(e)})
+                existing_resources = account.get("resources", [])
+                if check_duplicate_resource_id(existing_resources, validated.id):
+                    return response(400, {"error": f"Resource with id '{validated.id}' already exists in this account"})
+                resource_data = body.copy()
+                db_put({"PK": f"ACCOUNT#{account_id}", "SK": f"RESOURCE#{validated.id}", "data": resource_data})
+                return response(200, {"message": f"Resource {validated.id} created", "id": validated.id})
+            if len(parts) >= 5 and parts[3] == "resources":
+                resource_id = parts[4]
+                if not validate_path_parameter(resource_id):
+                    return response(400, {"error": "Invalid resource_id format"})
+                resource = find_resource(account, resource_id)
+                if not resource:
+                    return response(404, {"error": "Resource not found"})
+                if len(parts) == 5 and method == "DELETE":
+                    if not is_superadmin(user_info):
+                        return response(403, {"error": "Solo superadmin puede eliminar recursos"})
+                    db_delete(f"ACCOUNT#{account_id}", f"RESOURCE#{resource_id}")
+                    return response(200, {"message": f"Resource {resource_id} deleted"})
+                if len(parts) == 6:
+                    action = parts[5]
+                    if method == "GET" and action == "status":
+                        return _handle_resource_action(account, resource, "status")
+                    if method == "POST" and action == "start":
+                        return _handle_resource_action(account, resource, "start")
+                    if method == "POST" and action == "stop":
+                        return _handle_resource_action(account, resource, "stop")
+                    if method == "GET" and action == "uptime":
+                        # GET /api/accounts/{id}/resources/{rid}/uptime?range=7|30
+                        qs = event.get("queryStringParameters") or {}
+                        range_param = qs.get("range", "7")
+                        days = 30 if range_param == "30" else 7
+                        result = get_uptime_data(account_id, resource_id, days)
+                        return response(200, result)
+                    if method == "GET" and action == "metrics":
+                        return _handle_resource_metrics(account, resource)
             if len(parts) >= 4 and parts[3] == "groups":
                 if len(parts) == 4 and method == "POST":
                     if not is_superadmin(user_info):
