@@ -79,6 +79,13 @@ def db_query(pk, sk_prefix=None):
     return resp.get("Items", [])
 
 
+def db_query_between(pk, sk_start, sk_end):
+    """Query items by PK with SK between two values (inclusive)."""
+    table = get_table()
+    resp = table.query(KeyConditionExpression=Key("PK").eq(pk) & Key("SK").between(sk_start, sk_end))
+    return resp.get("Items", [])
+
+
 def decimal_to_native(obj):
     """Convert Decimal types from DynamoDB to Python native types."""
     if isinstance(obj, Decimal):
@@ -123,6 +130,8 @@ def load_config_from_db():
         account_map[acc_id]["instances"] = [decimal_to_native(i.get("data", {})) for i in inst_items]
         grp_items = db_query(f"ACCOUNT#{acc_id}", "GROUP#")
         account_map[acc_id]["groups"] = [decimal_to_native(g.get("data", {})) for g in grp_items]
+        res_items = db_query(f"ACCOUNT#{acc_id}", "RESOURCE#")
+        account_map[acc_id]["resources"] = [decimal_to_native(r.get("data", {})) for r in res_items]
         sched_items = db_query(f"ACCOUNT#{acc_id}", "SCHEDULE#")
         account_map[acc_id]["schedule"]["rules"] = [decimal_to_native(s.get("data", {})) for s in sched_items]
         ch_items = db_query(f"ACCOUNT#{acc_id}", "CHANNEL#")

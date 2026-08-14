@@ -82,6 +82,11 @@ def find_instance(account, instance_id):
     return next((i for i in account.get("instances", []) if i["id"] == instance_id), None)
 
 
+def find_resource(account, resource_id):
+    """Find a resource by ID within an account."""
+    return next((r for r in account.get("resources", []) if r["id"] == resource_id), None)
+
+
 def find_group(account, group_id):
     """Find a group by ID within an account."""
     return next((g for g in account.get("groups", []) if g["id"] == group_id), None)

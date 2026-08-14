@@ -4,6 +4,70 @@
 
 import { state, api, showToast, escapeHtml, logActivity } from './utils.js';
 import { showScreen } from './navigation.js';
+import { initUptimeChart, destroyUptimeChart } from './uptime-chart.js';
+import { initMetricsCharts, destroyMetricsCharts } from './metrics-chart.js';
+
+// ─── Resource Type Badge Helper ────────────────────────────────────────
+
+const RESOURCE_TYPE_LABELS = {
+    ec2: "EC2",
+    rds: "RDS",
+    ecs: "ECS",
+    lightsail: "Lightsail",
+    apprunner: "AppRunner",
+};
+
+/**
+ * Returns HTML for a resource type badge.
+ * Falls back to "EC2" if type is not recognized (backward compat).
+ */
+export function renderTypeBadge(type) {
+    const normalized = (type || "ec2").toLowerCase();
+    const label = RESOURCE_TYPE_LABELS[normalized] || RESOURCE_TYPE_LABELS["ec2"];
+    const cssClass = RESOURCE_TYPE_LABELS[normalized] ? normalized : "ec2";
+    return `<span class="resource-type-badge resource-type-${cssClass}">${label}</span>`;
+}
+
+// ─── View Toggle (Card / Table) ────────────────────────────────────────
+
+const VIEW_PREFERENCE_KEY = "ccp-view-preference";
+
+/**
+ * Returns the current view preference from localStorage.
+ * Defaults to "card" if no preference is stored.
+ */
+export function getViewPreference() {
+    const stored = localStorage.getItem(VIEW_PREFERENCE_KEY);
+    return stored === "table" ? "table" : "card";
+}
+
+/**
+ * Sets the view preference in localStorage and re-renders without data re-fetch.
+ */
+export function setViewPreference(preference) {
+    const value = preference === "table" ? "table" : "card";
+    localStorage.setItem(VIEW_PREFERENCE_KEY, value);
+    updateViewToggleButtons(value);
+    // Re-render using cached data (no API call)
+    if (state.cachedInstancesData) {
+        renderSoloInstances(
+            state.cachedInstancesData.instances || [],
+            state.cachedInstancesData.groups || []
+        );
+    }
+}
+
+/**
+ * Updates the toggle button active states.
+ */
+function updateViewToggleButtons(activeView) {
+    const cardBtn = document.getElementById("view-toggle-card");
+    const tableBtn = document.getElementById("view-toggle-table");
+    if (cardBtn && tableBtn) {
+        cardBtn.classList.toggle("active", activeView === "card");
+        tableBtn.classList.toggle("active", activeView === "table");
+    }
+}
 
 export async function refreshInstances() {
     if (!state.currentAccountId) return;
@@ -14,6 +78,9 @@ export async function refreshInstances() {
         renderGroups(data.groups || []);
         renderSoloInstances(data.instances || [], data.groups || []);
         checkSettingsVisibility();
+
+        // Initialize view toggle button state
+        updateViewToggleButtons(getViewPreference());
 
         // Show add buttons for superadmin only
         const isSuperadmin = state.userRole === "superadmin";
@@ -83,7 +150,11 @@ export function renderGroups(groups) {
                 </div>
             </div>
             <div class="group-members">
-                ${grp.members.map(m => `<span class="member-tag" style="border-color: ${groupColor}40; color: ${groupColor}">${m}</span>`).join("")}
+                ${grp.members.map(m => {
+                    const memberInst = (state.cachedInstancesData?.instances || []).find(i => i.id === m);
+                    const memberType = memberInst ? memberInst.type : "ec2";
+                    return `<span class="member-tag" style="border-color: ${groupColor}40; color: ${groupColor}">${renderTypeBadge(memberType)}${m}</span>`;
+                }).join("")}
             </div>
         </div>`;
     }).join("");
@@ -117,15 +188,30 @@ export function renderSoloInstances(instances, groups) {
         return;
     }
 
-    container.innerHTML = soloInstances.map(inst => {
+    const viewMode = getViewPreference();
+
+    if (viewMode === "table") {
+        container.innerHTML = renderTableView(soloInstances);
+    } else {
+        container.innerHTML = renderCardView(soloInstances);
+    }
+}
+
+/**
+ * Renders resources as individual cards (default view).
+ * Each card shows: name, type badge, state indicator, and IP/identifier.
+ */
+function renderCardView(instances) {
+    return instances.map(inst => {
         const stateClass = inst.state || "stopped";
         return `
-        <div class="instance-item" onclick="openInstance('${inst.id}', false)">
+        <div class="instance-item view-card" onclick="openInstance('${inst.id}', false)">
             <div class="instance-info">
                 <span class="indicator ${stateClass}"></span>
                 <div class="instance-text">
                     <span class="instance-name">${escapeHtml(inst.name)}</span>
-                    <span class="instance-meta">${inst.instanceId}${inst.publicIp ? ' · ' + inst.publicIp : ''}</span>
+                    ${renderTypeBadge(inst.type)}
+                    <span class="instance-meta">${inst.instanceId || inst.resourceId || ''}${inst.publicIp ? ' · ' + inst.publicIp : ''}</span>
                 </div>
             </div>
             <div class="instance-right">
@@ -141,6 +227,39 @@ export function renderSoloInstances(instances, groups) {
     }).join("");
 }
 
+/**
+ * Renders resources as a table with columns: Name, Type, State, IP/Identifier.
+ */
+function renderTableView(instances) {
+    const rows = instances.map(inst => {
+        const stateClass = inst.state || "stopped";
+        const ip = inst.publicIp || inst.instanceId || inst.resourceId || "--";
+        return `
+        <tr class="view-table-row" onclick="openInstance('${inst.id}', false)">
+            <td class="view-table-cell view-table-cell-name">
+                <span class="indicator indicator-sm ${stateClass}"></span>
+                <span>${escapeHtml(inst.name)}</span>
+            </td>
+            <td class="view-table-cell view-table-cell-type">${renderTypeBadge(inst.type)}</td>
+            <td class="view-table-cell view-table-cell-state"><span class="instance-state-badge ${stateClass}">${inst.state || "stopped"}</span></td>
+            <td class="view-table-cell view-table-cell-ip">${escapeHtml(ip)}</td>
+        </tr>`;
+    }).join("");
+
+    return `
+    <table class="view-table">
+        <thead>
+            <tr>
+                <th class="view-table-header">Nombre</th>
+                <th class="view-table-header">Tipo</th>
+                <th class="view-table-header">Estado</th>
+                <th class="view-table-header">IP / Identificador</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
 // ─── Instance Detail ───────────────────────────────────────────────────
 
 export function openInstance(instanceId, fromGroup) {
@@ -149,6 +268,8 @@ export function openInstance(instanceId, fromGroup) {
     showScreen("detail-screen");
     refreshInstanceDetail();
     loadActivity();
+    initUptimeChart();
+    initMetricsCharts();
     if (state.statusInterval) clearInterval(state.statusInterval);
     state.statusInterval = setInterval(refreshInstanceDetail, 30000);
 }

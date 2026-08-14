@@ -178,7 +178,14 @@ def handle_instance_start(account, instance, user_info):
     ec2 = get_ec2_client(account)
     ec2.start_instances(InstanceIds=[instance["instanceId"]])
     logger.info(f"[ACTION] user={user_info['name']} action=START instance={instance['instanceId']}")
-    log_activity(account["id"], "start", user_info.get("name", "unknown"), [instance["instanceId"]])
+    log_activity(
+        account["id"],
+        "start",
+        user_info.get("name", "unknown"),
+        [instance["instanceId"]],
+        resource_type="ec2",
+        resource_name=instance.get("name", instance["id"]),
+    )
     send_notifications(account, "started", instance.get("name", instance["id"]), user_info)
     return response(200, {"message": "Instance starting", "instanceId": instance["instanceId"]})
 
@@ -191,7 +198,14 @@ def handle_instance_stop(account, instance, user_info):
     ec2 = get_ec2_client(account)
     ec2.stop_instances(InstanceIds=[instance["instanceId"]])
     logger.info(f"[ACTION] user={user_info['name']} action=STOP instance={instance['instanceId']}")
-    log_activity(account["id"], "stop", user_info.get("name", "unknown"), [instance["instanceId"]])
+    log_activity(
+        account["id"],
+        "stop",
+        user_info.get("name", "unknown"),
+        [instance["instanceId"]],
+        resource_type="ec2",
+        resource_name=instance.get("name", instance["id"]),
+    )
     send_notifications(account, "stopped", instance.get("name", instance["id"]), user_info)
     return response(200, {"message": "Instance stopping", "instanceId": instance["instanceId"]})
 

@@ -6,7 +6,7 @@ All POST/PUT endpoints validate request bodies using these models.
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # --- Reusable patterns ---
@@ -14,6 +14,8 @@ ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 AWS_INSTANCE_ID_PATTERN = re.compile(r"^i-[a-f0-9]{8,17}$")
 AWS_ROLE_ARN_PATTERN = re.compile(r"^arn:aws:iam::\d{12}:role/.+$")
 AWS_REGION_PATTERN = re.compile(r"^[a-z]{2}-[a-z]+-\d$")
+RDS_RESOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]*$")
+LIGHTSAIL_RESOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.\-]*$")
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 CRON_PATTERN = re.compile(r"^[0-9*,/-]+\s+[0-9*,/-]+\s+[0-9*,/-]+\s+[0-9*,/-]+\s+[0-9*,/-]+$")
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -108,6 +110,88 @@ class CreateInstanceRequest(BaseModel):
         if v and not ID_PATTERN.match(v):
             raise ValueError("group must be a valid ID (alphanumeric + hyphens/underscores)")
         return v
+
+
+# --- Resource models (multi-service) ---
+
+RESOURCE_TYPES = ("ec2", "rds", "ecs", "lightsail", "apprunner")
+
+
+class CreateResourceRequest(BaseModel):
+    """Validation model for POST /api/accounts/{id}/resources."""
+
+    id: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=100)
+    type: Literal["ec2", "rds", "ecs", "lightsail", "apprunner"]
+    resourceId: str = Field(..., min_length=1, max_length=200)
+    # Optional type-specific config
+    resourceType: Literal["cluster", "instance"] | None = None  # RDS
+    targetCount: int | None = Field(default=None, ge=1, le=10)  # ECS
+    description: str | None = Field(default=None, max_length=1000)
+    group: str | None = Field(default=None, max_length=50)
+
+    @field_validator("id")
+    @classmethod
+    def validate_resource_id_field(cls, v: str) -> str:
+        return validate_id(v, "id")
+
+    @field_validator("resourceId")
+    @classmethod
+    def validate_resource_id_format(cls, v: str, info) -> str:
+        """Validate resourceId format based on resource type."""
+        # Type may not be available during individual field validation in all cases,
+        # so full type-specific validation is done in the model validator below.
+        return v
+
+    @field_validator("group")
+    @classmethod
+    def validate_group_ref(cls, v: str | None) -> str | None:
+        if v and not ID_PATTERN.match(v):
+            raise ValueError("group must be a valid ID (alphanumeric + hyphens/underscores)")
+        return v
+
+    @model_validator(mode="after")
+    def validate_resource_id_by_type(self) -> "CreateResourceRequest":
+        """Validate resourceId format based on the resource type."""
+        resource_type = self.type
+        resource_id = self.resourceId
+
+        if resource_type == "ec2":
+            if not AWS_INSTANCE_ID_PATTERN.match(resource_id):
+                raise ValueError("resourceId for ec2 must match pattern i-[a-f0-9]{8,17}")
+        elif resource_type == "rds":
+            if len(resource_id) > 63:
+                raise ValueError("resourceId for rds must be 1-63 characters")
+            if not RDS_RESOURCE_ID_PATTERN.match(resource_id):
+                raise ValueError("resourceId for rds must contain only alphanumeric characters and hyphens")
+        elif resource_type == "ecs":
+            # ECS accepts ARN or cluster/service format, 1-200 chars (already enforced by Field)
+            pass
+        elif resource_type == "lightsail":
+            if len(resource_id) > 63:
+                raise ValueError("resourceId for lightsail must be 1-63 characters")
+            if not LIGHTSAIL_RESOURCE_ID_PATTERN.match(resource_id):
+                raise ValueError(
+                    "resourceId for lightsail must contain only alphanumeric characters, hyphens, and periods"
+                )
+        elif resource_type == "apprunner":
+            if not resource_id.startswith("arn:aws:apprunner:"):
+                raise ValueError("resourceId for apprunner must start with 'arn:aws:apprunner:'")
+
+        return self
+
+
+def check_duplicate_resource_id(existing_resources: list[dict], new_resource_id: str) -> bool:
+    """Check if a resource ID already exists in the account's resource list.
+
+    Args:
+        existing_resources: List of existing resource dicts in the account.
+        new_resource_id: The ID of the new resource being created.
+
+    Returns:
+        True if a duplicate exists, False otherwise.
+    """
+    return any(r.get("id") == new_resource_id for r in existing_resources)
 
 
 # --- Group models ---

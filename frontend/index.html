@@ -6,6 +6,7 @@
     <title>Cloud Control Panel</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/></svg>">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Auth Screen -->
@@ -175,7 +176,17 @@
 
         <!-- Solo Instances (not in any group) -->
         <section id="solo-instances-section" class="card">
-            <h2>Instancias</h2>
+            <div class="instances-section-header">
+                <h2>Instancias</h2>
+                <div id="view-toggle" class="view-toggle">
+                    <button id="view-toggle-card" class="view-toggle-btn active" onclick="setViewPreference('card')" title="Vista de tarjetas" aria-label="Vista de tarjetas">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    </button>
+                    <button id="view-toggle-table" class="view-toggle-btn" onclick="setViewPreference('table')" title="Vista de tabla" aria-label="Vista de tabla">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
             <div id="instances-list" class="instances-list">
                 <div class="skeleton"></div>
                 <div class="skeleton"></div>
@@ -365,6 +376,49 @@
                     </svg>
                     Dashboard
                 </button>
+            </div>
+        </section>
+
+        <!-- Uptime Chart -->
+        <section class="card">
+            <div class="uptime-chart-header">
+                <h2>Uptime</h2>
+                <div class="uptime-range-selector">
+                    <button id="uptime-range-7" class="uptime-range-btn active" onclick="selectUptimeRange(7)">7 days</button>
+                    <button id="uptime-range-30" class="uptime-range-btn" onclick="selectUptimeRange(30)">30 days</button>
+                </div>
+            </div>
+            <div id="uptime-chart-container" class="uptime-chart-container">
+                <canvas id="uptime-chart-canvas"></canvas>
+                <p id="uptime-no-data-message" class="uptime-no-data hidden">No activity data available</p>
+            </div>
+            <div class="uptime-legend">
+                <span class="uptime-legend-item"><span class="uptime-legend-dot uptime-running"></span>Running</span>
+                <span class="uptime-legend-item"><span class="uptime-legend-dot uptime-stopped"></span>Stopped</span>
+                <span class="uptime-legend-item"><span class="uptime-legend-dot uptime-unknown"></span>Unknown</span>
+            </div>
+        </section>
+
+        <!-- CloudWatch Metrics -->
+        <section class="card">
+            <div class="metrics-chart-header">
+                <h2>Metrics</h2>
+            </div>
+            <!-- CPU Utilization -->
+            <div class="metrics-chart-section">
+                <h3 class="metrics-chart-label">CPU Utilization</h3>
+                <div id="metrics-cpu-container" class="metrics-chart-container">
+                    <canvas id="metrics-cpu-canvas"></canvas>
+                    <p id="metrics-cpu-message" class="metrics-no-data hidden">No CPU data available</p>
+                </div>
+            </div>
+            <!-- Memory Utilization -->
+            <div class="metrics-chart-section">
+                <h3 class="metrics-chart-label">Memory Utilization</h3>
+                <div id="metrics-memory-container" class="metrics-chart-container">
+                    <canvas id="metrics-memory-canvas"></canvas>
+                    <p id="metrics-memory-message" class="metrics-no-data hidden">Memory monitoring not enabled on this resource</p>
+                </div>
             </div>
         </section>
 
