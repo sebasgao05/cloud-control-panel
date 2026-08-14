@@ -50,9 +50,9 @@ class TestHealthCheckScriptStructure:
         assert "RESPONSE_TIMEOUT=10" in content or "--max-time" in content
 
     def test_script_content_has_health_endpoint(self):
-        """Req 12.1: Script must target /api/accounts endpoint."""
+        """Req 12.1: Script must target /api/health endpoint."""
         content = read_script()
-        assert "/api/accounts" in content
+        assert "/api/health" in content
 
     def test_script_content_has_retry_logic(self):
         """Req 12.2: Script must retry up to 3 times."""
