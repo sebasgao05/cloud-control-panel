@@ -153,6 +153,11 @@ def lambda_handler(event, context):
 
     config = load_config_from_db()
     parts = path.strip("/").split("/")
+
+    # Health check endpoint (no auth required)
+    if method == "GET" and parts == ["api", "health"]:
+        return response(200, {"status": "ok"})
+
     if method == "POST" and parts == ["api", "migrate"]:
         user_info = authenticate(event, config)
         if not user_info or (user_info.get("role") != "superadmin" and not is_admin(user_info)):

@@ -4,7 +4,7 @@
 #
 # Validates deployment by:
 #   1. Waiting 30 seconds for stack stabilization
-#   2. Sending HTTP GET to {stack-url}/api/accounts with 10-second timeout
+#   2. Sending HTTP GET to {stack-url}/api/health with 10-second timeout
 #   3. Retrying up to 3 times with 10-second intervals on failure
 #   4. Triggering CloudFormation rollback if all retries fail
 #   5. Sending notification on failure with status details
@@ -47,7 +47,7 @@ fi
 
 # ─── Configuration ──────────────────────────────────────────────────────
 
-HEALTH_ENDPOINT="${STACK_URL}/api/accounts"
+HEALTH_ENDPOINT="${STACK_URL}/api/health"
 MAX_RETRIES=3
 RETRY_INTERVAL=10
 RESPONSE_TIMEOUT=10
