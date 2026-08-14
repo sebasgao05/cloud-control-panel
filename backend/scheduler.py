@@ -208,15 +208,21 @@ def _handle_scheduler_resource_event(account, account_id, action, resource_ids, 
                 f"type={resource_type} account={account_id} rule={rule_id}"
             )
             log_activity(
-                account_id, action, "Scheduler", [res_id],
-                rule_id=rule_id, resource_type=resource_type, resource_name=resource_name,
+                account_id,
+                action,
+                "Scheduler",
+                [res_id],
+                rule_id=rule_id,
+                resource_type=resource_type,
+                resource_name=resource_name,
             )
 
         except Exception as e:
             logger.error(f"[SCHEDULER EVENT] Error {action} resource {res_id} (type={resource_type}): {e}")
             errors.append(f"{resource_type}:{res_id} - {e!s}")
             send_notifications(
-                account, "error",
+                account,
+                "error",
                 f"Scheduler error ({action}) {resource_type} '{resource_name}': {e!s}",
             )
 
@@ -232,8 +238,7 @@ def _handle_scheduler_resource_event(account, account_id, action, resource_ids, 
 
     return {
         "statusCode": 200,
-        "body": f"{action} executed for {len(results)} resources"
-        + (f" ({len(errors)} errors)" if errors else ""),
+        "body": f"{action} executed for {len(results)} resources" + (f" ({len(errors)} errors)" if errors else ""),
     }
 
 

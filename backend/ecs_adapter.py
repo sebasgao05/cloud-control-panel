@@ -55,7 +55,9 @@ def _parse_ecs_resource_id(resource_id: str) -> tuple[str, str]:
         return "default", resource_id
 
 
-def normalize_ecs_state(desired_count: int, running_count: int, task_states: list[str] | None = None) -> NormalizedState:
+def normalize_ecs_state(
+    desired_count: int, running_count: int, task_states: list[str] | None = None
+) -> NormalizedState:
     """Normalize ECS service state based on desiredCount and runningCount.
 
     Args:
@@ -134,10 +136,7 @@ class ECSAdapter(ResourceAdapter):
                 service=service_name,
                 desiredCount=target_count,
             )
-            logger.info(
-                f"[ECS] UpdateService: {cluster_name}/{service_name} "
-                f"desiredCount={target_count}"
-            )
+            logger.info(f"[ECS] UpdateService: {cluster_name}/{service_name} desiredCount={target_count}")
 
             return {
                 "state": "pending",
@@ -147,10 +146,7 @@ class ECSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[ECS] Start failed for {cluster_name}/{service_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[ECS] Start failed for {cluster_name}/{service_name}: {error_code} - {error_message}")
             return {
                 "state": "error",
                 "message": f"ECS start failed for '{cluster_name}/{service_name}': {error_code}",
@@ -195,10 +191,7 @@ class ECSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[ECS] Stop failed for {cluster_name}/{service_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[ECS] Stop failed for {cluster_name}/{service_name}: {error_code} - {error_message}")
             return {
                 "state": "error",
                 "message": f"ECS stop failed for '{cluster_name}/{service_name}': {error_code}",
@@ -226,9 +219,7 @@ class ECSAdapter(ResourceAdapter):
 
             services = resp.get("services", [])
             if not services:
-                logger.warning(
-                    f"[ECS] No service found: {cluster_name}/{service_name}"
-                )
+                logger.warning(f"[ECS] No service found: {cluster_name}/{service_name}")
                 return {
                     "state": "unknown",
                     "rawState": "not_found",
@@ -241,9 +232,7 @@ class ECSAdapter(ResourceAdapter):
 
             normalized = normalize_ecs_state(desired_count, running_count)
 
-            raw_state = (
-                f"desired={desired_count},running={running_count}"
-            )
+            raw_state = f"desired={desired_count},running={running_count}"
 
             return {
                 "state": normalized,
@@ -255,10 +244,7 @@ class ECSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[ECS] Status check failed for {cluster_name}/{service_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[ECS] Status check failed for {cluster_name}/{service_name}: {error_code} - {error_message}")
             return {
                 "state": "unknown",
                 "rawState": "error",

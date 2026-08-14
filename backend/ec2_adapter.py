@@ -44,9 +44,7 @@ class EC2Adapter(ResourceAdapter):
         normalized = EC2_STATE_MAP.get(current, "unknown")
 
         if normalized == "running":
-            logger.info(
-                f"[EC2] Instance {instance_id} already running, skipping start"
-            )
+            logger.info(f"[EC2] Instance {instance_id} already running, skipping start")
             return {
                 "status": "success",
                 "message": "Resource already running",
@@ -66,10 +64,7 @@ class EC2Adapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[EC2] start_instances failed for {instance_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[EC2] start_instances failed for {instance_id}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"EC2 start failed for {instance_id}: {error_code}",
@@ -88,9 +83,7 @@ class EC2Adapter(ResourceAdapter):
         normalized = EC2_STATE_MAP.get(current, "unknown")
 
         if normalized == "stopped":
-            logger.info(
-                f"[EC2] Instance {instance_id} already stopped, skipping stop"
-            )
+            logger.info(f"[EC2] Instance {instance_id} already stopped, skipping stop")
             return {
                 "status": "success",
                 "message": "Resource already stopped",
@@ -110,10 +103,7 @@ class EC2Adapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[EC2] stop_instances failed for {instance_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[EC2] stop_instances failed for {instance_id}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"EC2 stop failed for {instance_id}: {error_code}",
@@ -139,10 +129,7 @@ class EC2Adapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[EC2] describe_instances failed for {instance_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[EC2] describe_instances failed for {instance_id}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"EC2 status check failed for {instance_id}: {error_code}",

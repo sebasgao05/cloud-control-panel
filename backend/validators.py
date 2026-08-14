@@ -158,42 +158,30 @@ class CreateResourceRequest(BaseModel):
 
         if resource_type == "ec2":
             if not AWS_INSTANCE_ID_PATTERN.match(resource_id):
-                raise ValueError(
-                    "resourceId for ec2 must match pattern i-[a-f0-9]{8,17}"
-                )
+                raise ValueError("resourceId for ec2 must match pattern i-[a-f0-9]{8,17}")
         elif resource_type == "rds":
             if len(resource_id) > 63:
-                raise ValueError(
-                    "resourceId for rds must be 1-63 characters"
-                )
+                raise ValueError("resourceId for rds must be 1-63 characters")
             if not RDS_RESOURCE_ID_PATTERN.match(resource_id):
-                raise ValueError(
-                    "resourceId for rds must contain only alphanumeric characters and hyphens"
-                )
+                raise ValueError("resourceId for rds must contain only alphanumeric characters and hyphens")
         elif resource_type == "ecs":
             # ECS accepts ARN or cluster/service format, 1-200 chars (already enforced by Field)
             pass
         elif resource_type == "lightsail":
             if len(resource_id) > 63:
-                raise ValueError(
-                    "resourceId for lightsail must be 1-63 characters"
-                )
+                raise ValueError("resourceId for lightsail must be 1-63 characters")
             if not LIGHTSAIL_RESOURCE_ID_PATTERN.match(resource_id):
                 raise ValueError(
                     "resourceId for lightsail must contain only alphanumeric characters, hyphens, and periods"
                 )
         elif resource_type == "apprunner":
             if not resource_id.startswith("arn:aws:apprunner:"):
-                raise ValueError(
-                    "resourceId for apprunner must start with 'arn:aws:apprunner:'"
-                )
+                raise ValueError("resourceId for apprunner must start with 'arn:aws:apprunner:'")
 
         return self
 
 
-def check_duplicate_resource_id(
-    existing_resources: list[dict], new_resource_id: str
-) -> bool:
+def check_duplicate_resource_id(existing_resources: list[dict], new_resource_id: str) -> bool:
     """Check if a resource ID already exists in the account's resource list.
 
     Args:

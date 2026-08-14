@@ -128,6 +128,7 @@ def _handle_resource_metrics(account: dict, resource: dict) -> dict:
 
     return response(200, result)
 
+
 def lambda_handler(event, context):
     """Main Lambda entry point - routes requests to handler modules."""
     if event.get("source") == "scheduler":

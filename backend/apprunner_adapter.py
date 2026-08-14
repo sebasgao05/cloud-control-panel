@@ -45,9 +45,7 @@ class AppRunnerAdapter(ResourceAdapter):
         normalized = self._normalize_state(current_status)
 
         if normalized == "running":
-            logger.info(
-                f"[APPRUNNER] Service {service_arn} already running, skipping start"
-            )
+            logger.info(f"[APPRUNNER] Service {service_arn} already running, skipping start")
             return {
                 "status": "success",
                 "message": "Resource already running",
@@ -67,10 +65,7 @@ class AppRunnerAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[APPRUNNER] resume_service failed for {service_arn}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[APPRUNNER] resume_service failed for {service_arn}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"AppRunner start failed for {service_arn}: {error_code}",
@@ -90,9 +85,7 @@ class AppRunnerAdapter(ResourceAdapter):
         normalized = self._normalize_state(current_status)
 
         if normalized == "stopped":
-            logger.info(
-                f"[APPRUNNER] Service {service_arn} already stopped, skipping stop"
-            )
+            logger.info(f"[APPRUNNER] Service {service_arn} already stopped, skipping stop")
             return {
                 "status": "success",
                 "message": "Resource already stopped",
@@ -112,10 +105,7 @@ class AppRunnerAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[APPRUNNER] pause_service failed for {service_arn}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[APPRUNNER] pause_service failed for {service_arn}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"AppRunner stop failed for {service_arn}: {error_code}",
@@ -142,10 +132,7 @@ class AppRunnerAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[APPRUNNER] describe_service failed for {service_arn}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[APPRUNNER] describe_service failed for {service_arn}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"AppRunner status check failed for {service_arn}: {error_code}",
@@ -201,9 +188,7 @@ class AppRunnerAdapter(ResourceAdapter):
             # the OperationId or Status metadata.
             # AppRunner provides the latest operation in the Service response.
             operation_type = (
-                service.get("LatestOperation", {}).get("OperationType", "")
-                if "LatestOperation" in service
-                else ""
+                service.get("LatestOperation", {}).get("OperationType", "") if "LatestOperation" in service else ""
             )
 
             if operation_type == "PAUSE_SERVICE":

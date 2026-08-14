@@ -92,10 +92,7 @@ class RDSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[RDS] Start failed for {resource_type} {resource_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[RDS] Start failed for {resource_type} {resource_id}: {error_code} - {error_message}")
             return {
                 "state": "error",
                 "message": f"RDS start failed for {resource_type} '{resource_id}': {error_code}",
@@ -140,10 +137,7 @@ class RDSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[RDS] Stop failed for {resource_type} {resource_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[RDS] Stop failed for {resource_type} {resource_id}: {error_code} - {error_message}")
             return {
                 "state": "error",
                 "message": f"RDS stop failed for {resource_type} '{resource_id}': {error_code}",
@@ -162,14 +156,10 @@ class RDSAdapter(ResourceAdapter):
 
         try:
             if resource_type == "cluster":
-                resp = self.client.describe_db_clusters(
-                    DBClusterIdentifier=resource_id
-                )
+                resp = self.client.describe_db_clusters(DBClusterIdentifier=resource_id)
                 raw_state = resp["DBClusters"][0]["Status"]
             else:
-                resp = self.client.describe_db_instances(
-                    DBInstanceIdentifier=resource_id
-                )
+                resp = self.client.describe_db_instances(DBInstanceIdentifier=resource_id)
                 raw_state = resp["DBInstances"][0]["DBInstanceStatus"]
 
             normalized: NormalizedState = RDS_STATE_MAP.get(raw_state, "unknown")
@@ -182,10 +172,7 @@ class RDSAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[RDS] Status check failed for {resource_type} {resource_id}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[RDS] Status check failed for {resource_type} {resource_id}: {error_code} - {error_message}")
             return {
                 "state": "unknown",
                 "rawState": "error",

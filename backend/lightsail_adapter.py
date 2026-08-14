@@ -43,9 +43,7 @@ class LightsailAdapter(ResourceAdapter):
         normalized = LIGHTSAIL_STATE_MAP.get(current, "unknown")
 
         if normalized == "running":
-            logger.info(
-                f"[LIGHTSAIL] Instance {instance_name} already running, skipping start"
-            )
+            logger.info(f"[LIGHTSAIL] Instance {instance_name} already running, skipping start")
             return {
                 "status": "success",
                 "message": "Resource already running",
@@ -65,10 +63,7 @@ class LightsailAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[LIGHTSAIL] start_instance failed for {instance_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[LIGHTSAIL] start_instance failed for {instance_name}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"Lightsail start failed for {instance_name}: {error_code}",
@@ -87,9 +82,7 @@ class LightsailAdapter(ResourceAdapter):
         normalized = LIGHTSAIL_STATE_MAP.get(current, "unknown")
 
         if normalized == "stopped":
-            logger.info(
-                f"[LIGHTSAIL] Instance {instance_name} already stopped, skipping stop"
-            )
+            logger.info(f"[LIGHTSAIL] Instance {instance_name} already stopped, skipping stop")
             return {
                 "status": "success",
                 "message": "Resource already stopped",
@@ -109,10 +102,7 @@ class LightsailAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[LIGHTSAIL] stop_instance failed for {instance_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[LIGHTSAIL] stop_instance failed for {instance_name}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"Lightsail stop failed for {instance_name}: {error_code}",
@@ -138,10 +128,7 @@ class LightsailAdapter(ResourceAdapter):
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[LIGHTSAIL] get_instance failed for {instance_name}: "
-                f"{error_code} - {error_message}"
-            )
+            logger.error(f"[LIGHTSAIL] get_instance failed for {instance_name}: {error_code} - {error_message}")
             return {
                 "status": "error",
                 "message": f"Lightsail status check failed for {instance_name}: {error_code}",

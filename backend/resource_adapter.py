@@ -13,6 +13,7 @@ from typing import Literal
 class CrossAccountAccessError(Exception):
     """Raised when cross-account STS AssumeRole fails."""
 
+
 import boto3
 from botocore.exceptions import ClientError
 
@@ -79,32 +80,17 @@ class ResourceAdapter(ABC):
             account_id = self.account.get("id", "unknown")
 
             if error_code == "AccessDenied":
-                logger.error(
-                    f"[CROSS-ACCOUNT] AccessDenied assuming role {role_arn} "
-                    f"for account {account_id}"
-                )
-                raise PermissionError(
-                    f"Cross-account access denied for account {account_id}"
-                ) from e
+                logger.error(f"[CROSS-ACCOUNT] AccessDenied assuming role {role_arn} for account {account_id}")
+                raise PermissionError(f"Cross-account access denied for account {account_id}") from e
 
             if error_code == "ExpiredTokenException" or error_code == "ExpiredToken":
-                logger.error(
-                    f"[CROSS-ACCOUNT] ExpiredToken assuming role {role_arn} "
-                    f"for account {account_id}"
-                )
-                raise RuntimeError(
-                    f"Cross-account session expired for account {account_id}"
-                ) from e
+                logger.error(f"[CROSS-ACCOUNT] ExpiredToken assuming role {role_arn} for account {account_id}")
+                raise RuntimeError(f"Cross-account session expired for account {account_id}") from e
 
             # All other AssumeRole failures
             error_message = e.response["Error"].get("Message", str(e))
-            logger.error(
-                f"[CROSS-ACCOUNT] AssumeRole failed for account {account_id}: "
-                f"{error_code} - {error_message}"
-            )
-            raise CrossAccountAccessError(
-                f"Cross-account access failed for account {account_id}: {error_code}"
-            ) from e
+            logger.error(f"[CROSS-ACCOUNT] AssumeRole failed for account {account_id}: {error_code} - {error_message}")
+            raise CrossAccountAccessError(f"Cross-account access failed for account {account_id}: {error_code}") from e
 
         return {
             "aws_access_key_id": creds["AccessKeyId"],
@@ -135,18 +121,23 @@ def get_adapter(account: dict, resource: dict) -> "ResourceAdapter":
     # import this base class, so we import them only when needed.
     if resource_type == "ec2":
         from ec2_adapter import EC2Adapter
+
         return EC2Adapter(account, resource)
     elif resource_type == "rds":
         from rds_adapter import RDSAdapter
+
         return RDSAdapter(account, resource)
     elif resource_type == "ecs":
         from ecs_adapter import ECSAdapter
+
         return ECSAdapter(account, resource)
     elif resource_type == "lightsail":
         from lightsail_adapter import LightsailAdapter
+
         return LightsailAdapter(account, resource)
     elif resource_type == "apprunner":
         from apprunner_adapter import AppRunnerAdapter
+
         return AppRunnerAdapter(account, resource)
     else:
         raise ValueError(f"Unsupported resource type: {resource_type}")

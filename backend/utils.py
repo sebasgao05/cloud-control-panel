@@ -82,9 +82,7 @@ def db_query(pk, sk_prefix=None):
 def db_query_between(pk, sk_start, sk_end):
     """Query items by PK with SK between two values (inclusive)."""
     table = get_table()
-    resp = table.query(
-        KeyConditionExpression=Key("PK").eq(pk) & Key("SK").between(sk_start, sk_end)
-    )
+    resp = table.query(KeyConditionExpression=Key("PK").eq(pk) & Key("SK").between(sk_start, sk_end))
     return resp.get("Items", [])
 
 
