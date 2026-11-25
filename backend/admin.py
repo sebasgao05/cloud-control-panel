@@ -4,7 +4,7 @@ Account, instance, group, API key management, and cost estimation.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import bcrypt
 from pydantic import ValidationError
@@ -292,7 +292,7 @@ def handle_get_costs(account, user_info):
     except Exception as e:
         logger.error(f"[COSTS] describe_instances failed: {e}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     days_elapsed = max(now.day, 1)
     costs = []
     total_cost = 0

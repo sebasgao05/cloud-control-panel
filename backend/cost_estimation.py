@@ -4,7 +4,7 @@ Calculates costs for RDS, ECS, Lightsail, and AppRunner resources
 using per-type hourly rates based on size designation.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 # ─── Pricing Tables (On-Demand, us-east-1, USD/hour) ─────────────────────
 
@@ -101,7 +101,7 @@ def calculate_resource_cost(
         Dict with: resource_type, uptime_hours, hourly_rate, accumulated_cost, monthly_projection.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     hourly_rate = get_hourly_rate(resource_type, size_designation)
     accumulated_cost = uptime_hours * hourly_rate

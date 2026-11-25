@@ -2,7 +2,7 @@
 Cloud Control Panel - EC2/SSM operations, instance and group handlers.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import boto3
 
@@ -92,7 +92,7 @@ def handle_list_instances(account):
         launch_time = live.get("launchTime")
         uptime = None
         if state == "running" and launch_time:
-            delta = datetime.now(timezone.utc) - launch_time
+            delta = datetime.now(UTC) - launch_time
             hours, remainder = divmod(int(delta.total_seconds()), 3600)
             uptime = f"{hours}h {remainder // 60}m"
         result_instances.append(
@@ -151,7 +151,7 @@ def handle_instance_status(account, instance):
     launch_time = inst_data.get("LaunchTime")
     uptime = None
     if state == "running" and launch_time:
-        delta = datetime.now(timezone.utc) - launch_time
+        delta = datetime.now(UTC) - launch_time
         hours, remainder = divmod(int(delta.total_seconds()), 3600)
         uptime = f"{hours}h {remainder // 60}m"
     return response(
