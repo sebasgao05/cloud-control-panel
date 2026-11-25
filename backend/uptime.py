@@ -3,7 +3,7 @@ Cloud Control Panel - Uptime chart data provider.
 Builds hourly uptime timelines from Activity_Log entries in DynamoDB.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from utils import db_query_between, decimal_to_native
 
@@ -23,7 +23,7 @@ def get_uptime_data(account_id: str, resource_id: str, days: int) -> dict:
     Returns:
         Dict with resourceId, range, intervals list, and optional message.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     start_time = now - timedelta(days=days)
 
     # Truncate to the start of the hour
@@ -103,9 +103,9 @@ def get_uptime_data(account_id: str, resource_id: str, days: int) -> dict:
             try:
                 # Handle both formats: with and without fractional seconds
                 if "." in event_ts_str:
-                    event_ts = datetime.fromisoformat(event_ts_str.replace("Z", "+00:00"))
+                    event_ts = datetime.fromisoformat(event_ts_str)
                 else:
-                    event_ts = datetime.strptime(event_ts_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                    event_ts = datetime.strptime(event_ts_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
             except (ValueError, TypeError):
                 event_idx += 1
                 continue

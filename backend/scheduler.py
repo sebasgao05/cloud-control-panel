@@ -5,7 +5,7 @@ EventBridge Scheduler CRUD, activity logging, and scheduler event handling.
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import boto3
 from pydantic import ValidationError
@@ -44,7 +44,7 @@ def log_activity(account_id, action, user_name, instance_ids, rule_id=None, reso
         resource_type: Resource type (one of: ec2, rds, ecs, lightsail, apprunner).
         resource_name: Human-readable resource name.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
     entry = {
         "action": action,

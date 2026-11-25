@@ -5,7 +5,7 @@ Email, Telegram, and Teams sending.
 
 import json
 import smtplib
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from email.mime.text import MIMEText
 from urllib import request as urllib_request
 
@@ -42,7 +42,7 @@ def handle_update_notifications(account, account_id, user_info, body):
         db_delete(item["PK"], item["SK"])
     for ch in body.get("channels", []):
         if not ch.get("id"):
-            ch["id"] = f"ch-{int(datetime.now(timezone.utc).timestamp())}"
+            ch["id"] = f"ch-{int(datetime.now(UTC).timestamp())}"
         db_put({"PK": f"ACCOUNT#{account_id}", "SK": f"CHANNEL#{ch['id']}", "data": ch})
     return response(200, {"message": "Notificaciones actualizadas"})
 
@@ -99,7 +99,7 @@ def send_notifications(account, event, instance_name, user_info=None, resource_t
         f"resource_name: {instance_name}\n"
         f"Cuenta: {account_name}\n"
         f"Ejecutado por: {user_name} ({user_role})\n"
-        f"Fecha: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+        f"Fecha: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
         f"Cloud Control Panel"
     )

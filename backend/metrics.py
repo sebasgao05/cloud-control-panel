@@ -5,7 +5,7 @@ Fetches CPU and memory utilization metrics for running resources.
 Uses cross-account STS sessions for remote accounts.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, UTC
 
 import boto3
 from botocore.config import Config
@@ -197,7 +197,7 @@ def handle_get_metrics(account: dict, resource: dict) -> dict:
     try:
         client = _get_cloudwatch_client(account)
 
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         start_time = end_time - timedelta(minutes=60)
 
         # Query CPU utilization
